@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: 备份mysql数据库
+name: backupMysqlDBCronjob
+type: application
+version: "0.1.4"

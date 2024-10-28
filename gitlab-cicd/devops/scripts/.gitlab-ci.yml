@@ -1,0 +1,41 @@
+image: harbor.betack.com/libs/alpine-ansible:3.15.4
+
+before_script:
+  - eval $(ssh-agent -s)
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  # ansible 配置文件
+  - mkdir /etc/ansible/; mv ansible.cfg /etc/ansible/ && ls -lh /etc/ansible/
+
+variables:
+  ANSIBLE_HOST_KEY_CHECKING: "False"
+  DEPLOY_PKG: "ops-libs.tar.gz"
+  NEED_PKG_DIRS: "ops-libs shell-scripts"
+
+workflow:
+  rules:
+    - changes:
+      - README.md     # 若要触发gitlab pipeline，需要修改项目的 README.md 文件
+      when: always
+
+stages:          # List of stages for jobs, and their order of execution
+  - build
+  - deploy
+
+build-job1:       # This job runs in the build stage, which runs first.
+  stage: build
+  script:
+    - echo "打包 ops-libs 运维相关的公共库脚本."
+    - pwd; ls -lh
+    - tar -czvf $DEPLOY_PKG $NEED_PKG_DIRS && ls -lh || exit
+    - ansible all -i ansible_hosts -u $SSH_USER -m copy -a "src=$DEPLOY_PKG dest=/home/betack/script/$DEPLOY_PKG"
+
+deploy-job1:      # This job runs in the deploy stage.
+  stage: deploy  # It only runs when *both* jobs in the test stage complete successfully.
+  script:
+    - echo "Deploying application..."
+    # - ansible all -i ansible_hosts -u $SSH_USER -m shell -a "cd /home/betack/script/ && ls -lh "
+    - ansible all -i ansible_hosts -u $SSH_USER -m shell -a "cd /home/betack/script/ && tar -zxf $DEPLOY_PKG && rm $DEPLOY_PKG && ls -lh $NEED_PKG_DIRS"
+  dependencies: 
+    - build-job1

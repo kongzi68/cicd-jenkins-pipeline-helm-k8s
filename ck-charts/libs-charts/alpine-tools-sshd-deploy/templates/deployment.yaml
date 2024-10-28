@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "alpine-tools-sshd-deploy.fullname" . }}-{{ include "alpine-tools-sshd-deploy.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "alpine-tools-sshd-deploy.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "alpine-tools-sshd-deploy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "alpine-tools-sshd-deploy.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.image.imgNameOrSvcName }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.imgHarbor }}/{{ .Values.image.harborProject }}/{{ .Values.image.imgNameOrSvcName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          lifecycle:
+            postStart:
+              exec:
+                command: ["/bin/sh", "-c", "echo 'iamusername:{{ .Values.sshPasswd }}' | chpasswd"]
+          ports:
+            {{- range $.Values.service.ports }}
+            - name: port-{{ . }}
+              containerPort: {{ . }}
+              protocol: TCP
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.storage.isMountLogPV }}
+          volumeMounts:
+            - name: {{ include "alpine-tools-sshd-deploy.name" . }}-log
+              mountPath: {{ .Values.storage.logPVCMountPath }}
+          {{- end }}
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        nameservers:
+        - IAmIPaddress
+        - IAmIPaddress
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.storage.isMountLogPV }}
+      volumes:
+        - name: {{ include "alpine-tools-sshd-deploy.name" . }}-log
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-log-pvc
+      {{- end }}

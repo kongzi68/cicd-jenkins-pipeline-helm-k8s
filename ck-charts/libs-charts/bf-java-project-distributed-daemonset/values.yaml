@@ -1,0 +1,117 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: saas-data-server
+namespacePrefix: 'saasdata'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称，
+  imgNameOrSvcName: saas-data-server
+  imgHarbor: IAmIPaddress
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: bf-bsc
+  # repository: IAmIPaddress/rab/saas-data-server
+  pullPolicy: IfNotPresent
+  tag: "5582a203-15"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+storage:
+  storageEnable: false
+  ## local 本地二进制缓存持久卷
+  isCreateLocalCachePVC: false
+  isMountLocalCachePV: false
+  localCacheCapacity: '100Gi'
+  localCacheStorageClassName: local-storage
+  localCachePath: /mnt/disks/ssd1
+  localCachePodPath: /opt/saas-data/cache
+  ## parquet 共享卷
+  isCreateParquetPVC: false
+  isMountParquetPV: false
+  parquetPodMountPath: /opt/saas-data/parquet
+  parquetStorageClassName: nfs-client-229-retain
+  ## 日志存储，挂载日志存储路径：/var/log
+  isCreateLogPVC: false
+  isMountLogPV: false
+  logStorageClassName: nfs-client-retain-2
+  ## mosek，挂载路径：/thirdparty/mosek，/iamusername/mosek
+  isCreateMosekPVC: false
+  isMountMosekPV: false
+  mosekStorageClassName: nfs-client-retain
+  ## 有些服务，除了需要挂载api的data pv卷，还需要自己独立的pv卷
+  isCreateAlonePVC: false
+  isMountAlonePV: false
+  #+ 设置为空的时候，默认创建 300Gi
+  aloneCapacity: ""
+  aloneDataPVCMountPath: /opt/saas-data/data/rabbeyond
+  aloneDataStorageClassName: nfs-client-retain-2
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [5005, 9099, 12233] # 容器需要启动的端口
+
+## 设置是否开启jmxremote调试
+#+ isopen 为 true，表示创建 NodePort 类型的service；fasle 表示不创建
+#+ ports: 31099，这个31099既是jmxremote的端口，同时也是NodePort的端口
+#+ hostnameIp 是k8s集群节点的ip
+jmxremote:
+  isopen: false
+  ports: 31099
+  hostnameIp: 'IAmIPaddress'
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+nodeSelector:
+  saas-data: 'true'
+
+tolerations: []
+
+affinity: 
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: saas-data
+          operator: In
+          values:
+          - 'true'
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 1
+      preference:
+        matchExpressions:
+        - key: saas-data
+          operator: In
+          values:
+          - 'true'
+
+### isCommand 与 isCommandOps 二选一，将替换镜像中的command
+#+ 或者是都设置为false，即不设置 command，此时默认用镜像中的command
+## 用于直接指定command的项目
+isCommand: false
+command: ''
+
+## 设置服务的启动参数
+isCommandOps: true
+commandOps:
+  - -Dspring.profiles.active=dev1
+  - -DLOG_BASE_PATH=/var/log
+  - --add-opens=java.base/java.nio=ALL-UNNAMED
+  - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+  - -Dloader.path=/thirdparty/mosek/
+  - -Djava.library.path=/thirdparty/mosek/

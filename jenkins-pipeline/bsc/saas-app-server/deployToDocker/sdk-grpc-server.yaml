@@ -1,0 +1,18 @@
+- name: deploy sdk-grpc-server
+  hosts: "IAmIPaddress"
+  gather_facts: no
+  tasks:
+    - name: Restart a container
+      docker_container:
+        name: bsc-sdk-grpc-server
+        image: harbor.betack.com/rabbeyond/sdk-grpc-server:22-1.10.36
+        state: started
+        restart: yes
+        ports:
+        # Publish container port 50053 as host port 50050
+        #- "50050:50053"
+        - "51004:50053"
+        volumes:
+          - /data1t/bsc-data/bsc-sdk-grpc-server/grpc-server.toml:/opt/betack/grpc-server.toml
+          - /data1t/bsc-data/bsc-rabbeyond:/opt/betack/rabbeyond
+        command: ["java", "-jar", "/opt/betack/sdk-grpc-server-1.10.36-all.jar"]

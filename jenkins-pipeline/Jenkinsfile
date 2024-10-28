@@ -1,0 +1,244 @@
+#!groovy
+// 公共
+def registry = "harbor.od.com"
+// 项目
+//def project = "tfy"
+//def app_name = "tfy-server-api"
+//def JAR_PKG_NAME = 'tianfu-culture-api/target/tianfu-culture-api.jar'
+//def image_name = "${registry}/${project}/${app_name}:${BUILD_NUMBER}"
+
+def git_address = "ssh://git@code.betack.com:4022/betack/rab-backend.git"
+// 认证
+def secret_name = "bf-harbor"
+def harbor_auth = "443eb7ee-c21b-4e32-b449-e01d83171672"
+def git_auth = "41dfa7f4-d5f9-4892-a8ba-6b0d31a7cd84"
+
+pipeline {
+  agent {
+    kubernetes {
+      defaultContainer 'jnlp'
+      workspaceVolume persistentVolumeClaimWorkspaceVolume(claimName: 'jenkins-agent-workspace', readOnly: false)
+      // 注意：ubuntu-jenkins-agent 镜像，需要安装中文语言包
+      yaml """\
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: jenkins-slave
+          labels:
+            app: jenkins-agent
+        spec:
+          containers:
+          - name: jnlp
+            image: "${registry}/libs/ubuntu-jenkins-agent:v2"
+            imagePullPolicy: Always
+            resources:
+              limits: {}
+              requests:
+                memory: "1000Mi"
+                cpu: "500m"
+            env:
+              - name: "file.encoding"
+                value: "UTF-8"
+              - name: "LANG"
+                value: "zh_CN.UTF-8"
+              - name: "sun.jnu.encoding"
+                value: "UTF-8"
+            tty: true
+            preStop:
+              exec:
+                command: ["/bin/sh","-c","cp -ru /iamusername/.gradle/caches /master_gradle/.gradle/"]
+            volumeMounts:
+              - name: docker-cmd
+                mountPath: /usr/bin/docker
+              - name: docker-sock
+                mountPath: /var/run/docker.sock
+              - name: master-gradle-cache
+                mountPath: /master_gradle/
+              - name: slave-gradle-cache
+                mountPath: /iamusername/.gradle/
+                readOnly: false
+          dnsConfig:
+            nameservers:
+            - IAmIPaddress
+            - IAmIPaddress
+          imagePullSecrets:
+          - name: bf-harbor
+          volumes:
+            - name: docker-cmd
+              hostPath:
+                path: /usr/bin/docker
+            - name: docker-sock
+              hostPath:
+                path: /var/run/docker.sock
+            - name: master-gradle-cache
+              persistentVolumeClaim:
+                claimName: jenkins-agent-gradle-cache
+            - name: slave-gradle-cache
+              emptyDir:
+                medium: ""
+        """.stripIndent()
+    }
+  }
+
+  // 设置pipeline Jenkins选项参数
+  options {
+    skipDefaultCheckout true          // 忽略默认的checkout
+    skipStagesAfterUnstable()         // 忽略报错后面的步骤
+    //retry(2)                        // 重试次数
+    timestamps()                      // 添加时间戳
+    timeout(time: 20, unit:'MINUTES') // 设置此次发版运行20分钟后超时
+    buildDiscarder logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '30', numToKeepStr: '30')  // 设置保留30天的构建历史，或者30次的构建记录
+  }
+
+  parameters {
+    gitParameter branch: '',
+                 branchFilter: '.*',
+                 defaultValue: 'master',
+                 description: '选择需要发布的代码分支',
+                 name: 'BRANCH_TAG',
+                 quickFilterEnabled: true,
+                 selectedValue: 'NONE',
+                 sortMode: 'NONE',
+                 tagFilter: '*',
+                 type: 'PT_BRANCH'
+    booleanParam defaultValue: false,
+                 description: '勾选此选项后，切换到JDK8； 默认为JDK11。',
+                 name: 'JDK_VERSION'
+    booleanParam defaultValue: false,
+                 description: '勾选此选项后，执行命令：gradle clean，清理构建环境。',
+                 name: 'CLEAN_BUILD'
+    extendedChoice description: '请选择本次发版需要部署的服务',
+                   multiSelectDelimiter: ',',
+                   name: 'DEPLOY_SVC_NAME',
+                   quoteValue: false,
+                   saveJSONParameterToFile: false,
+                   type: 'PT_CHECKBOX',
+                   value: 'rab-task-data-migration,rab-svc-api-app,rab-svc-offline-app,rab-svc-timeseries-data-generator,embed-dao-exposure',
+                   visibleItemCount: 8
+    string description: 'rab-task-data-migration 参数。多个参数用空格分隔，【注意】每次都会默认清空上一次变量参数，如果要保持上一次变量参数，请重新填写',
+           name: 'migration_parameter',
+           trim: true
+    extendedChoice description: '发版到选中的运行环境',
+                   multiSelectDelimiter: ',',
+                   name: 'DEPLOY_TO_ENV',
+                   quoteValue: false,
+                   saveJSONParameterToFile: false,
+                   type: 'PT_CHECKBOX',
+                   value: 'dev1,dev2,dev3,dev4,staging1,staging2,test_ops',
+                   visibleItemCount: 7
+  }
+
+  stages {
+    stage('拉取代码') {
+      steps {
+        echo '正在拉取代码...'
+        script {
+          try {
+            checkout([$class: 'GitSCM',
+              branches: [[name: "${params.BRANCH_TAG}"]],
+              browser: [$class: 'GitLab', repoUrl: ''],
+              userRemoteConfigs: [[credentialsId: "${git_auth}", url: "${git_address}"]]])
+          } catch(Exception err) {
+            echo err.getMessage()
+            echo err.toString()
+            unstable '拉取代码失败'
+          }
+          // 获取提交代码的ID，用于打包容器镜像
+          env.GIT_COMMIT_MSG = sh (script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+        }
+      }
+    }
+
+    stage('环境准备') {
+      stages {
+        stage('环境准备：切换java版本') {
+          when {
+            expression {
+              return params.JDK_VERSION
+            }
+          }
+          steps {
+            echo "原本 java 版本信息如下："
+            sh 'java -version'
+            echo "开始切换 java 版本."
+            sh """
+              update-alternatives --install /usr/bin/java java /usr/lib/jvm/java-8-openjdk-amd64/bin/java 1081
+              update-alternatives --config java
+              update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/bin/java
+              java -version
+            """
+          }
+        }
+        stage('环境准备：gradle clean') {
+          when {
+            expression {
+              return params.CLEAN_BUILD
+            }
+          }
+          steps {
+            echo "执行命令：gradle clean，清理构建环境"
+            sh 'gradle clean'
+          }
+        }
+        stage('环境准备：gradle缓存复用') {
+          steps {
+            echo "当前jenkins环境用户为iamusername，所以GRADLE缓存复用路径为：/iamusername/.gradle/caches"
+            sh 'cp -r /master_gradle/.gradle/caches /iamusername/.gradle/'
+          }
+        }
+      }
+    }
+
+    stage('代码编译打包') {
+      steps {
+        echo '正在构建...'
+        script {
+          try {
+            sh 'gradle clean build -x test'
+          } catch(Exception err) {
+            echo err.getMessage()
+            echo err.toString()
+            unstable '构建失败'
+          }
+        }
+      }
+    }
+
+
+
+    stage('打印信息') {
+      steps {
+        sh 'echo ${GIT_COMMIT_MSG}'
+        sh """
+          pwd
+          ls -lha
+        """
+      }
+    }
+
+
+    stage('检查 kubectl 版本') {
+      steps {
+        sh """
+          kubectl version
+          """
+      }
+    }
+    stage('检查 rancher 版本') {
+      steps {
+        sh """
+          rancher -version
+          """
+      }
+    }
+    stage('检查 npm 与 yarn 命令') {
+      steps {
+        sh """
+          npm config list
+          yarn config list
+          """
+      }
+    }
+  }
+}
+

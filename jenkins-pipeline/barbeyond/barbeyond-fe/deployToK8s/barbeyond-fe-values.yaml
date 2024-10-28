@@ -1,0 +1,90 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: rabbeyond-fe
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  repository: IAmIPaddress:8765/rabbeyond/rabbeyond-fe
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [80] # 容器需要启动的端口
+
+resources: 
+  limits:
+    cpu: 350m
+    memory: 1200Mi
+  requests:
+    cpu: 250m
+    memory: 1000Mi
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+## 非 nginx.conf，是 web.conf 配置文件
+nginxWebConf: |-
+    server{
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name localhost;
+
+        access_log /var/log/nginx/access.log;
+        error_log /var/log/nginx/error.log;
+
+        location ^~ /chkstatus {
+            alias /var/www/chkstatus/;
+            access_log off;
+            error_log /dev/null;
+        }
+
+        location / {
+            iamusername /var/www/html;
+            try_files $uri /index.html index.html;
+            expires -1;
+        }
+
+        location ~* /api {
+            proxy_pass API_ADDRS;
+        }
+
+        location ~ ^/(arrow.flight.protocol.FlightService|log_subscribe_user.LogSubscribeUser|log_subscribe.LogSubscribeInfo) {
+            grpc_pass GRPC_ADDRS;      
+        }
+
+        location /rabbeyond {
+            proxy_pass SOCKET_ADDRS;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "Upgrade";
+        }
+    }
+
+

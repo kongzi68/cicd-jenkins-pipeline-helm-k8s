@@ -1,0 +1,71 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: content-managment
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称，
+  imgNameOrSvcName: content-managment
+  imgHarbor: IAmIPaddress:8765
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: betack
+  # repository: IAmIPaddress:8765/betack/content-managment
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [1337] # 容器需要启动的端口
+
+resources: 
+  limits:
+    cpu: 350m
+    memory: 1200Mi
+  requests:
+    cpu: 250m
+    memory: 1000Mi
+
+## 健康检查
+isReadinessProbeEnabled: false
+readinessProbe:
+  tcpSocket:
+    port: 1337
+  initialDelaySeconds: 10
+  periodSeconds: 5
+
+## 就绪检查
+isLivenessProbeEnabled: false
+livenessProbe:
+  tcpSocket:
+    port: 1337
+  initialDelaySeconds: 60
+  periodSeconds: 30
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

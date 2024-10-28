@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bf-rust-cargo-project-deploy-common.fullname" . }}-{{ include "bf-rust-cargo-project-deploy-common.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-rust-cargo-project-deploy-common.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "bf-rust-cargo-project-deploy-common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bf-rust-cargo-project-deploy-common.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.image.imgNameOrSvcName }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.imgHarbor }}/{{ .Values.image.harborProject }}/{{ .Values.image.imgNameOrSvcName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.isCommand }}
+          command:
+            - /bin/sh
+            - -c
+            - {{ .Values.command }}
+          {{- end }}
+          ports:
+            {{- range $.Values.service.ports }}
+            - name: port-{{ . }}
+              containerPort: {{ . }}
+              protocol: TCP
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: betanlp-conf
+              mountPath: /opt/betack/config.yaml
+              subPath: config.yaml
+          {{- if .Values.storage.storageEnable }}
+            {{- if .Values.storage.isMountLogPV }}
+            - name: {{ include "bf-rust-cargo-project-deploy-common.name" . }}-log
+              mountPath: /var/log
+            {{- end }}
+            {{- if .Values.storage.isMountDataPV }}
+            - name: {{ include "bf-rust-cargo-project-deploy-common.name" . }}-data
+              mountPath: {{ .Values.storage.dataPVCMountPath }}
+            {{- end }}
+          {{- end }}
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        nameservers:
+        - IAmIPaddress
+        - IAmIPaddress
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: betanlp-conf
+          configMap:
+            name: {{ .Values.nameOverride }}-betanlp-conf
+      {{- if .Values.storage.storageEnable }}
+        {{- if .Values.storage.isMountLogPV }}
+        - name: {{ include "bf-rust-cargo-project-deploy-common.name" . }}-log
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-log-pvc
+        {{- end }}
+        {{- if .Values.storage.isMountDataPV }}
+        - name: {{ include "bf-rust-cargo-project-deploy-common.name" . }}-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-{{ print .Values.storage.dataPVCNameInfix "-" }}data-pvc
+        {{- end }}
+      {{- end }}
+

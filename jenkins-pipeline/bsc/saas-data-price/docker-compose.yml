@@ -1,0 +1,42 @@
+services:
+  saas-data-price:
+    image: harbor.betack.com/bf-open-share/saas-data-price:5c77d58-206
+    stdin_open: true
+    volumes:
+    - /var/log/saas-data-price:/var/log
+    - /etc/localtime:/etc/localtime:ro
+    - /etc/timezone:/etc/timezone:ro
+    tty: true
+    restart: always
+    ports:
+    - 8090:80/tcp
+    command:
+    - java
+    - -Dlog.path=/var/log
+    - -Dspring.profiles.active=prod
+    - -Ddata2.mysql.host=IAmIPaddress
+    - -Ddata2.mysql.port=65010
+    - -Ddata2.mysql.data=saas_data
+    - -Ddata2.mysql.username=xiaobeidata
+    - -Ddata2.mysql.password=Ys4kziDbg99bz5y7jlhI
+    - -Ddata1.mysql.host=mysql80-svc
+    - -Ddata1.mysql.port=3306
+    - -Ddata1.mysql.data=saas_data_price
+    - -Ddata1.mysql.username=iamusername
+    - -Ddata1.mysql.password=iampassword
+    - -jar
+    - /opt/betack/saas-data-price.jar
+  saasdata-mysql:
+    image: mysql:8.0.33-debian
+    environment:
+      MYSQL_iamusername_PASSWORD: beifa123456
+    stdin_open: true
+    volumes:
+    - /data/betack/data/mysql:/var/lib/mysql
+    - /etc/localtime:/etc/localtime:ro
+    - /etc/timezone:/etc/timezone:ro
+    - /data/betack/data/mysql-config/mysqld.cnf:/etc/mysql/mysql.conf.d/mysqld.cnf
+    tty: true
+    restart: always
+    ports:
+    - 3309:3306/tcp

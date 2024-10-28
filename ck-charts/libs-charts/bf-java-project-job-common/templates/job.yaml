@@ -1,0 +1,118 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "bf-java-project-job-common.fullname" . }}-{{ include "bf-java-project-job-common.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-job-common.labels" . | nindent 4 }}
+spec:
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bf-java-project-job-common.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.image.imgNameOrSvcName }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.imgHarbor }}/{{ .Values.image.harborProject }}/{{ .Values.image.imgNameOrSvcName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.isCommand }}
+          command:
+            - /bin/sh
+            - -c
+            - {{ .Values.command }}
+          {{- else if .Values.isCommandOps }}
+          command: 
+            - /bin/sh
+            - '-c'
+            - >-
+              java
+              {{- range $.Values.commandOps }}
+              {{ . }}
+              {{- end }}
+              -jar /opt/betack/{{ .Values.image.imgNameOrSvcName }}.jar {{ .Values.svcJARPKGOptions | default "" }}
+          {{- end }}
+          {{- if .Values.envFrom.enabled }}
+          envFrom:
+          - secretRef:
+              name: {{ .Values.nameOverride }}-db-and-others-secret
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.storage.storageEnable }}
+          volumeMounts:
+            {{- if .Values.storage.isMountLogPV }}
+            - name: {{ include "bf-java-project-job-common.name" . }}-log
+              mountPath: /var/log
+            {{- end }}
+            {{- if or (eq .Values.storage.isMountDataPVType "empty") (eq .Values.storage.isMountDataPVType "pvc") }}
+            - name: {{ include "bf-java-project-job-common.name" . }}-data
+              mountPath: {{ .Values.storage.dataPVCMountPath }}
+            {{- end }}
+            {{- if .Values.storage.isMountMosekPV }}
+            - name: {{ include "bf-java-project-job-common.name" . }}-mosek
+              mountPath: /thirdparty/mosek
+            - name: {{ include "bf-java-project-job-common.name" . }}-mosek
+              mountPath: /iamusername/mosek
+            {{- end }}
+            {{- if .Values.storage.isMountAlonePV }}
+            - name: {{ include "bf-java-project-job-common.name" . }}-data-alone
+              mountPath: {{ .Values.storage.aloneDataPVCMountPath }}
+            {{- end }}
+          {{- end }}
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        nameservers:
+        - IAmIPaddress
+        - IAmIPaddress
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.storage.storageEnable }}
+      volumes:
+        {{- if .Values.storage.isMountLogPV }}
+        - name: {{ include "bf-java-project-job-common.name" . }}-log
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-log-pvc
+        {{- end }}
+        {{- if eq .Values.storage.isMountDataPVType "empty" }}
+        - name: {{ include "bf-java-project-job-common.name" . }}-data
+          emptyDir:
+            sizeLimit: {{ .Values.storage.Capacity | default "50Gi" }}
+        {{- else if eq .Values.storage.isMountDataPVType "pvc" }}
+        - name: {{ include "bf-java-project-job-common.name" . }}-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-{{ include "bf-java-project-job-common.dataPVCNameInfix" . }}data-pvc
+        {{- end }}
+        {{- if .Values.storage.isMountMosekPV }}
+        - name: {{ include "bf-java-project-job-common.name" . }}-mosek
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-mosek-lib-license-pvc
+        {{- end }}
+        {{- if .Values.storage.isMountAlonePV }}
+        - name: {{ include "bf-java-project-job-common.name" . }}-data-alone
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-{{ include "bf-java-project-job-common.aloneDataPVCNameInfix" . }}data-alone-pvc
+        {{- end }}
+      {{- end }}

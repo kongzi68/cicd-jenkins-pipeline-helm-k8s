@@ -1,0 +1,218 @@
+stages:
+  - commit_check
+  - test
+  - test_check
+  - build_check
+  - deploy
+  - deploy_to_jfrog_by_tags
+  - deploy_check
+
+
+# image: gradle:7.0.0-jdk11-openj9
+image: gradle:7.3-jdk11
+
+
+variables:
+  GIT_CLEAN_FLAGS: -ffdx -e .gradle/
+  GIT_CLONE_PATH: ${CI_BUILDS_DIR}builds/$CI_PROJECT_NAMESPACE/$CI_CONCURRENT_ID/$CI_PROJECT_NAME
+
+
+cache:
+  key: rab-key-to-rull-them-all
+  paths:
+    - .gradle/wrapper
+    - .gradle/caches
+
+
+unit-test:   # This job runs in the test stage.
+  stage: test    # It only starts when the job in the build stage completes successfully.
+  script:
+    - gradle test --stacktrace -DJFROG_USER=$JFROG_USER -DJFROG_PWD=$JFROG_PWD
+    #- ./gradlew scalaTest -DJFROG_USER=$JFROG_USER -DJFROG_PWD=$JFROG_PWD
+    - gradle sonarqube --stacktrace -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN --warning-mode all
+    #only:
+    # - masterz
+  #only:
+   # - masterz
+  except: 
+    - tags
+
+
+#sonarqube-test:
+#  stage: test
+#  image: gradle:7-jdk11-openj9   #sonar need
+#  variables:
+#    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+#    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+#  cache:
+#    key: "${CI_JOB_NAME}"
+#    paths:
+#      - .sonar/cache
+#  script: gradle sonarqube -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN --warning-mode all
+  #only:
+   # - masterz # or the name of your main branch  http://ci.betack.com:61378 549d6ccf3825b34147db1a1c69e5cce4fcef4b94
+  # except: 
+  #   - tags
+
+
+test_check:
+  stage: test_check
+  script:
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/ /+/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/%/%25/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/#/%23/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/&/%26/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/=/%3D/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/@/%40/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/</%3c/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/>/%3e/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/\[/%5B/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/\]/%5D/g'`
+  #- curl -X POST http://IAmIPaddress:8081/view/devops/job/devops-rabbeyond/buildWithParameters --user gitlabci:bfisnotgf -d branch=$CI_BUILD_REF_NAME\&commitid=$CI_BUILD_REF\&gitlabuser=$GITLAB_USER_NAME\&project=$CI_PROJECT_NAME\&gitlabns=$CI_PROJECT_NAMESPACE\&beizhu=$CI_COMMIT_MESSAGE\&stack=backend\&errorzz="单元测试或sonar异常"
+  when: on_failure
+  #only:
+  #  - masterz
+  except: 
+    - tags
+
+#build:
+#  stage: build
+#  script:
+#    - echo "Compiling the code..."
+    #- ./gradlew clean -Dorg.gradle.project.version=$CI_PIPELINE_IID -x test
+#    - gradle clean build -Dorg.gradle.project.version=$CI_PIPELINE_IID -x test
+#    - apt update
+#    - apt install sshpass -y
+#    - echo 'StrictHostKeyChecking no'>>/etc/ssh/ssh_config
+#    - echo "scp jar to remote repository $JAR_REPOSITORY_PATH"
+#    - mv ./build/libs/rab-engine-x-`echo $(gradle -q getProjectVersion)`.jar ./build/libs/rab-engine-x-$CI_PIPELINE_IID-SNAPSHOT.jar
+#    - sshpass -p $JAR_REPOSITORY_PWD scp $PROJECT_JAR_PATH $JAR_REPOSITORY_USER@$JAR_REPOSITORY_PATH
+#  cache:
+#    key: $CI_COMMIT_REF_SLUG
+#    paths:
+#      - $PROJECT_JAR_PATH
+#    policy: push
+#  when: always
+  #only:
+  #  - masterz
+
+
+# 原来旧有的publish
+job:on-schedule:
+  stage: deploy
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - echo "execute gradle publish..."
+    - gradle clean publish -DJFROG_USER=$JFROG_USER -DJFROG_USER=$JFROG_PWD
+
+
+#+ 新增基于tags的publish
+deploy_to_jfrog_by_tags:
+  stage: deploy_to_jfrog_by_tags
+  script:
+    - gradle clean publish -x test -DJFROG_USER=$JFROG_USER -DJFROG_USER=$JFROG_PWD
+  only:
+    - tags
+  except: 
+    - branches
+
+
+build_check:
+  stage: build_check
+  script:
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/ /+/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/%/%25/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/#/%23/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/&/%26/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/=/%3D/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/@/%40/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/</%3c/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/>/%3e/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/\[/%5B/g'`
+  - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/\]/%5D/g'`
+  #- curl -X POST http://IAmIPaddress:8081/view/devops/job/devops-rabbeyond/buildWithParameters --user gitlabci:bfisnotgf -d branch=$CI_BUILD_REF_NAME\&commitid=$CI_BUILD_REF\&gitlabuser=$GITLAB_USER_NAME\&project=$CI_PROJECT_NAME\&gitlabns=$CI_PROJECT_NAMESPACE\&beizhu=$CI_COMMIT_MESSAGE\&stack=backend\&errorzz="构建异常"
+  when: on_failure
+  #only:
+  # - masterz
+  except: 
+    - tags
+
+
+commit_check:
+   stage: commit_check
+   script:
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_MESSAGE|awk -F '^' '{print $(NF-1)}'`
+   - CI_PROJECT_URLz=`echo $CI_PROJECT_URL|awk -F '//' '{print $2}'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/ /+/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/%/%25/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/#/%23/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/&/%26/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/=/%3D/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/@/%40/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/</%3c/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/>/%3e/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/\[/%5B/g'`
+   - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/\]/%5D/g'`
+   #- curl -X POST http://IAmIPaddress:8081/view/devops/job/devops-rabbeyond/buildWithParameters --user gitlabci:bfisnotgf -d branch=$CI_BUILD_REF_NAME\&commitid=$CI_BUILD_REF\&gitlabuser=$GITLAB_USER_NAME\&project=$CI_PROJECT_NAME\&gitlabns=$CI_PROJECT_NAMESPACE\&beizhu=$CI_COMMIT_BRANCHz\&stack=backend\&errorzz=0
+   #only:
+   # - masterz
+
+
+dev_deploy:
+  stage: deploy
+  image: sikalabs/kubectl:latest
+  script:
+    - mkdir -p ~/.kube
+    - echo $KUBE_CONFIG > ~/.kube/config
+    - sed -i "s/CI_JAR_VERSION/$CI_PIPELINE_IID/g"  ./deploy/base/*
+    - kubectl apply -k ./deploy/overlays/dev
+  cache: { }
+  #rules:
+   # - if: $CI_COMMIT_MESSAGE =~ /.*\^dev$/
+    #- if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  only:
+    - masterz
+  except: 
+    - tags
+
+
+staging_deploy:
+  stage: deploy
+  image: sikalabs/kubectl:latest
+  script:
+    - mkdir -p ~/.kube
+    - echo $KUBE_CONFIG > ~/.kube/config
+    - sed -i "s/CI_JAR_VERSION/$CI_PIPELINE_IID/g"  ./deploy/base/*
+    - kubectl apply -k ./deploy/overlays/staging
+  cache: { }
+  #rules:
+   # - if: $CI_COMMIT_MESSAGE =~ /.*\^staging$/
+    #- if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  only:
+    - masterz
+  except: 
+    - tags
+
+
+deploy_check:
+  stage: deploy_check
+  script:
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_MESSAGE|awk -F '^' '{print $(NF-1)}'`
+  - CI_PROJECT_URLz=`echo $CI_PROJECT_URL|awk -F '//' '{print $2}'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/ /+/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/%/%25/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/#/%23/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/&/%26/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/=/%3D/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/@/%40/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/</%3c/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/>/%3e/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/\[/%5B/g'`
+  - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/\]/%5D/g'`
+  #- curl -X POST http://IAmIPaddress:8081/view/devops/job/devops-rabbeyond/buildWithParameters --user gitlabci:bfisnotgf -d branch=$CI_BUILD_REF_NAME\&commitid=$CI_BUILD_REF\&gitlabuser=$GITLAB_USER_NAME\&project=$CI_PROJECT_NAME\&gitlabns=$CI_PROJECT_NAMESPACE\&beizhu=$CI_COMMIT_BRANCHz\&stack=backend\&errorzz=0
+  #when: always
+  only:
+  - masterz
+  except: 
+    - tags

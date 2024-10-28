@@ -1,0 +1,71 @@
+{{ if .Values.storage.isCreateParquetPVC }}
+## parquet 共享卷
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-parquet-nfs-pvc
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.storage.parquetCapacity | default "500Gi" }}
+  storageClassName: {{ .Values.storage.parquetStorageClassName }}
+{{ end }}
+
+---
+
+{{ if .Values.storage.isCreateLogPVC }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-log-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 80Gi
+  storageClassName: {{ .Values.storage.logStorageClassName }}
+{{ end }}
+
+---
+
+{{ if and .Values.storage.storageEnable .Values.storage.isCreateMosekPVC }}
+## 153上的存储类
+#+ nfs-client-retain-2 支持命名空间隔离创建存储文件夹
+#+ 即指定了存储类参数 pathPattern: ${.PVC.namespace}/${.PVC.namespace}-${.PVC.name}
+## nfs-client-retain 存储类没有指定
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-mosek-lib-license-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: {{ .Values.storage.mosekStorageClassName }}
+{{ end }}
+
+---
+
+{{ if .Values.storage.isCreateAlonePVC }}
+## 有些服务，需要单独挂载数据卷
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-data-alone-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.storage.aloneCapacity | default "300Gi" }}
+  storageClassName: {{ .Values.storage.aloneDataStorageClassName }}
+{{ end }}
+

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.nameOverride }}-betanlp-conf
+data:
+  config.yaml: |-
+    {{- .Values.configYaml | nindent 4}}

@@ -1,0 +1,114 @@
+version: '2'
+services:
+  saas-data-server:
+    image: saas-data-server-IMAGE_NAME
+    stdin_open: true
+    volumes:
+    - /data2t/betack/saas-data:/opt/saas/data
+    tty: true
+    ports:
+    - 8083:8080/tcp
+    - 9090:9090/tcp
+    - 5005:5005/tcp
+    - 50053:50053/tcp
+    command:
+    - java
+    - -Dspring.profiles.active=saas-data-server-ENV
+    - -Dlog.path=/opt/saas/data/log
+    - -Xmx20G
+    - -XX:MaxDirectMemorySize=12G
+    - -Ddag.dagJobParallelNum=12
+    - -Ddag.dagParallelNum=4
+    - -XX:+HeapDumpOnOutOfMemoryError
+    - -XX:HeapDumpPath=/opt/saas/data/dump/dump.jprof
+    - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    - --add-opens=java.base/java.nio=ALL-UNNAMED
+    - --add-exports=java.base/sun.nio.ch=ALL-UNNAMED
+    - --add-opens=java.base/java.io=ALL-UNNAMED
+    - --add-opens=java.base/java.lang=ALL-UNNAMED
+    - --add-exports=java.base/sun.util.calendar=ALL-UNNAMED
+    - --add-exports=java.base/sun.security.action=ALL-UNNAMED
+    - --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED
+    - -jar
+    - /opt/betack/data-etl-server.jar
+    labels:
+      io.rancher.container.pull_image: always
+  data-subscriber-client:
+    image: data-subscriber-client-IMAGE_NAME
+    stdin_open: true
+    volumes:
+    - /data2t/betack/saas-data:/opt/saas/data
+    tty: true
+    ports:
+    - 5006:5005/tcp
+    - 8084:8081/tcp
+    - 9091:9091/tcp
+    - 10001:10001/tcp
+    command:
+    - java
+    - -Dspring.profiles.active=data-subscriber-client-ENV
+    - -Dlog.path=/opt/saas/data/log
+    - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    - --add-opens=java.base/java.io=ALL-UNNAMED
+    - --add-opens=java.base/java.nio=ALL-UNNAMED
+    - --add-opens=java.base/java.util=ALL-UNNAMED
+    - --add-opens=java.base/java.lang.invoke=ALL-UNNAMED
+    - --add-exports=java.base/sun.nio.ch=ALL-UNNAMED
+    - --add-exports=java.base/sun.util.calendar=ALL-UNNAMED
+    - --add-exports=java.base/sun.security.action=ALL-UNNAMED
+    - -jar
+    - /opt/betack/data-subscriber-client.jar
+    labels:
+      io.rancher.container.pull_image: always
+  etl-listener:
+    image: etl-listener-IMAGE_NAME
+    stdin_open: true
+    volumes:
+    - /data2t/betack/saas-data:/opt/saas/data
+    tty: true
+    ports:
+    # - 5006:5005/tcp
+    - 1301:1301/tcp
+    command:
+    - java
+    - -Dspring.profiles.active=etl-listener-ENV
+    - -Dlog.path=/opt/saas/data/log
+    # - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    - -jar
+    - /opt/betack/etl-listener.jar
+    labels:
+      io.rancher.container.pull_image: always
+  data-migration-job:
+    image: data-migration-job-IMAGE_NAME
+    stdin_open: true
+    tty: true
+    command:
+    - java
+    - -Xmx2g
+    - -Dspring.profiles.active=data-migration-job-ENV
+    - -jar
+    - /opt/betack/data-migration-job.jar
+    labels:
+      io.rancher.container.start_once: 'true'
+  data-meta-import-job:
+    image: data-meta-import-job-IMAGE_NAME
+    stdin_open: true
+    tty: true
+    command: java -Xmx2g -Dspring.profiles.active=data-meta-import-job-ENV -jar /opt/betack/data-meta-import-job.jar data-meta-import-job-OPTIONS
+    labels:
+      io.rancher.container.start_once: 'true'
+  mysql:
+    image: mysql:8.0.32
+    environment:
+      MYSQL_iamusername_PASSWORD: iampassword
+    stdin_open: true
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - /etc/timezone:/etc/timezone:ro
+    - /data2t/betack/data/mysql:/var/lib/mysql
+    - /data2t/betack/data/mysql-config/mysqld.cnf:/etc/mysql/mysql.conf.d/mysqld.cnf
+    tty: true
+    ports:
+    - 3310:3306/tcp
+    labels:
+      io.rancher.container.pull_image: always

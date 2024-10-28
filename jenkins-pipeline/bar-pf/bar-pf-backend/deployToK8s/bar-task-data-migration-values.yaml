@@ -1,0 +1,33 @@
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: rab-task-data-migration
+
+image:
+  repository: IAmIPaddress:8765/rab-pf/rab-task-data-migration
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+securityContext: {}
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+commands: "java -Dspring.profiles.active=CONFIG_ENV -DLOG_BASE_PATH=/var/log -jar /opt/betack/rab-task-data-migration-IMAGE_TAG.jar rab-task-data-migration-OPTIONS"
+

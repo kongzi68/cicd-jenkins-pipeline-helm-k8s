@@ -1,0 +1,109 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: betack-ai-data-sync
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称，
+  imgNameOrSvcName: betack-ai-data-sync
+  imgHarbor: IAmIPaddress:8765
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: rabbeyond
+  # repository: IAmIPaddress:8765/rabbeyond/betack-ai-data-sync
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+storage:
+  storageEnable: true
+  ## 二进制数据存储
+  isCreateDataPVC: true
+  isMountDataPV: true
+  #+ 设置为空的时候，默认创建 300Gi
+  # capacity: ""
+  capacity: "10Gi"
+  # PVC名称加中缀，特殊情况下使用，默认可设置为空，即''
+  dataPVCNameInfix: 'aidatasync'
+  dataPVCMountPath: /opt/betack/data_sync
+  dataStorageClassName: nfs-client-retain
+  ## 日志存储，挂载日志存储路径：/var/log
+  isCreateLogPVC: false
+  isMountLogPV: false
+  logStorageClassName: nfs-client-retain
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [15300] # 容器需要启动的端口
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+### isCommand 
+#+ 或者是都设置为false，即不设置 command，此时默认用镜像中的command
+## 用于直接指定command的项目
+isCommand: true
+# command: 'ls -lha; poetry shell; poetry run poe run'
+command: 'ls -lha; python src/__main__.py'
+
+## 注入为环境变量
+isConfigMapENV: true
+configMapENVYaml:
+    # rab
+    rab_HOST: "http://rab4ai.betack.com"
+    rab_TOKEN: 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMmU3MDdmNy1jZmFjLTRjZjQtOTQ4NC05MWE0ZmJkMzQ4NjMiLCJleHAiOjM3MjMzMDE2ODcsImF1dGhvcml0aWVzIjpbIlVTRVIiXSwianRpIjoibGFsX1ZLMVF6N3NOV3FiWml3YVFJR3JVMEdjIiwiY2xpZW50X2lkIjoiYWlfcG9ydGZvbGlvIiwic2NvcGUiOlsicmlza1N5c3RlbSJdfQ.cIPujxXneNO_fBOm6pf-G-_Mb2xW7D0OwmkeTuak5y-OOOIwVMObnE7Pp0mgeQraGAtO_ReDlvZPYLlfugQAu00JFjH0YLq29WVjuvWtroAD0M5scbd4jGMbrItnrbjG_PemWn7D9pI7fDuwxXcsUPa0sjyv_wpELta0oqWLb6W0tgnfSd5FUNemcRqt7iVKTuFy4AUuRE_pLxVJVsl8CxEyve-W2WLBhY5u24euTxz-naqeqDyWT5V6cEDOIpsMMHPdn88HyFJO6Z9gXO389JOsNLbxeJ4ybo1jnH5LnJvA1Gc-LcY_Cui1IuVIavs8Rt-VueM2BI8mZrTILMqngA'
+    # llm
+    OPENAI_API_KEY: 'sk-01321646+49+46+4313130320303'
+    GEMINI_API_KEY: 'AIzaSyCVDiSur6wiRDOJ1nXgDs3sd_iyzrY6p5E'
+    # remote file
+    REMOTE_FILE_API_URL: "http://IAmIPaddress:58080"
+    # remote file meta
+    MYSQL_HOST: "IAmIPaddress"
+    MYSQL_PORT: "53306"
+    MYSQL_USER: "iamusername"
+    MYSQL_PSD: "bfisnotgf"
+    MYSQL_FILE_META_DATABASE: "spiderman"
+    RAG_HOST: "http://IAmIPaddress:8099"
+    # qdrant
+    QDRANT_HOST: "http://IAmIPaddress:32631"
+    QDRANT_GRPC_PORT: "31237"
+    QDRANT_KEY: "password"
+    # record raw result
+    RECORD_FILE_DIR: "/opt/betack/data_sync"
+    # lance db
+    LANCE_DB_URL: "s3://betack-ai/lancedb"
+    TIMEOUT: "300s"
+    AWS_ENDPOINT: "http://IAmIPaddress:9000"
+    AWS_ACCESS_KEY_ID: "HPGvwBc7wcM6lnOYbeHL"
+    AWS_ALLOW_HTTP: "true"
+    AWS_SECRET_ACCESS_KEY: "ocHUKfJ5lhqzAgH1OPRlLFCy2x8zQ2yzYyT0Ah7o"
+    # proxy
+    ALL_PROXY: "http://shadowsocks-rust:8388"
+    HTTPS_PROXY: "http://shadowsocks-rust:8388"
+    HTTP_PROXY: "http://shadowsocks-rust:8388"
+    NO_PROXY: ".betack.com,localhost,IAmIPaddress,IAmIPaddress,IAmIPaddress,IAmIPaddress,IAmIPaddress"

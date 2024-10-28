@@ -1,0 +1,69 @@
+{{ if .Values.service.isIn }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-java-project-deploy-common-v3.name" . }}-in-{{ include "bf-java-project-deploy-common-v3.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-deploy-common-v3.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    {{- if .Values.service.isIn }}
+    {{- range $.Values.service.ports }}
+    - port: {{ . }}
+      targetPort: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+    {{- end }}
+  selector:
+    {{- include "bf-java-project-deploy-common-v3.selectorLabels" . | nindent 4 }}
+{{ end }}
+
+---
+
+{{ if .Values.service.isOut }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-java-project-deploy-common-v3.name" . }}-out-{{ include "bf-java-project-deploy-common-v3.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-deploy-common-v3.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  ports:
+    {{- range $.Values.service.ports }}
+    - port: {{ . }}
+      targetPort: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+  selector:
+    {{- include "bf-java-project-deploy-common-v3.selectorLabels" . | nindent 4 }}
+{{ end }}
+
+---
+#+ 用于java项目开启jmxremote调试功能
+#+ 需要指定 nodePort 端口为容器中 jmx 指定的端口
+{{ if .Values.jmxremote.isopen }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-java-project-deploy-common-v3.name" . }}-jmxremote-{{ include "bf-java-project-deploy-common-v3.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-deploy-common-v3.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  ports:
+    - port: {{ .Values.jmxremote.ports }}
+      targetPort: {{ .Values.jmxremote.ports }}
+      protocol: TCP
+      nodePort: {{ .Values.jmxremote.ports }}
+      name: jmxremoteport
+  selector:
+    {{- include "bf-java-project-deploy-common-v3.selectorLabels" . | nindent 4 }}
+{{ end }}
+ 

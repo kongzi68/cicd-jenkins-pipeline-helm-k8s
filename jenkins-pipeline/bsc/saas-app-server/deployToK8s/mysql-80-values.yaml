@@ -1,0 +1,57 @@
+# Default values for mysql.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: mysql
+
+image:
+  repository: mysql
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "8.0.29"
+
+imagePullSecrets:
+  name: harbor-outer
+
+mysql:
+  iamusernamePassword: iampassword
+
+storage:
+  capacity: 100G
+  storageClassName: longhorn-fast
+
+securityContext: {}
+
+service:
+  type: NodePort
+  port: 3306
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+configuration: |-
+  [mysqld]
+  default_authentication_plugin=mysql_native_password
+  pid-file        = /var/run/mysqld/mysqld.pid
+  socket          = /var/run/mysqld/mysqld.sock
+  datadir         = /var/lib/mysql
+  symbolic-links=0
+  max_connections=10000
+  bind-address=IAmIPaddress
+  #secure-file-priv= NULL
+  #max_connections = 2000
+  #skip-name-resolve
+  #secure_file_priv=/var/lib/mysql
+  #sql_mode=STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+  #!includedir /etc/mysql/conf.d/
+
+  [client]
+  default-character-set=utf8mb4
+
+  [mysql]
+  default-character-set=utf8mb4

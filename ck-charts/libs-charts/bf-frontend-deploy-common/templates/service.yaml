@@ -1,0 +1,44 @@
+{{ if .Values.service.isIn }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-frontend-deploy-common.name" . }}-in-{{ include "bf-frontend-deploy-common.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-frontend-deploy-common.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    {{- range $.Values.service.ports }}
+    - port: {{ . }}
+      targetPort: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+  selector:
+    {{- include "bf-frontend-deploy-common.selectorLabels" . | nindent 4 }}
+{{ end }}
+
+---
+
+{{ if .Values.service.isOut }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-frontend-deploy-common.name" . }}-out-{{ include "bf-frontend-deploy-common.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-frontend-deploy-common.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  ports:
+    {{- range $.Values.service.ports }}
+    - port: {{ . }}
+      targetPort: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+  selector:
+    {{- include "bf-frontend-deploy-common.selectorLabels" . | nindent 4 }}
+{{ end }}
+

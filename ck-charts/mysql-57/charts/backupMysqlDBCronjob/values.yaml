@@ -1,0 +1,33 @@
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: backup-mysql-db-cronjob
+namespacePrefix: 'rab'
+
+image:
+  imgMysql: mysql:5.7.38
+  imgAlpineTools: IAmIPaddress:8765/libs/alpine:python3.11.3-tools
+
+imagePullSecrets:
+  - name: harbor-inner
+
+## mysql 用户名与密码 base64 转码
+#+ 默认值：iamusername/iampassword
+mysql:
+  username: iamusername
+  password: iampassword
+  #+ mysql svc name
+  mysqlSVCName: 'mysql80-svc'
+
+## 存储备份文件的服务器用户名与密码
+#+ 默认值：iamusername/bfisnotgf
+storage:
+  username: IamUserName
+  password: IamPassword
+  ipaddr: IAmIPaddress
+  #+ 注意：路径结尾不需要带/符号
+  storageDir: /mnt/bf-nvme-pool1/bf-backup/
+
+cronjob:
+  ## 因控制器时区的问题，如果是CST，则为：0 10 * * *
+  #+ 但控制器时区是UTC，需要减 8
+  schedule: "5 16 * * *"

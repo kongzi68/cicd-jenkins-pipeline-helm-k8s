@@ -1,0 +1,153 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bf-java-project-deploy-common-v3.fullname" . }}-{{ include "bf-java-project-deploy-common-v3.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-deploy-common-v3.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "bf-java-project-deploy-common-v3.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bf-java-project-deploy-common-v3.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.image.imgNameOrSvcName }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.imgHarbor }}/{{ .Values.image.harborProject }}/{{ .Values.image.imgNameOrSvcName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.isCommand }}
+          command:
+            - /bin/sh
+            - -c
+            - {{ .Values.command }}
+          {{- else if .Values.isCommandOps }}
+          command: 
+            - /bin/sh
+            - '-c'
+            - >-
+              java
+            {{- if .Values.jmxremote.isopen }}
+              -Dcom.sun.management.jmxremote
+              -Dcom.sun.management.jmxremote.port={{ .Values.jmxremote.ports }}
+              -Dcom.sun.management.jmxremote.rmi.port={{ .Values.jmxremote.ports }}
+              -Djava.rmi.server.hostname={{ .Values.jmxremote.hostnameIp }}
+              -Dcom.sun.management.jmxremote.ssl=false
+              -Dcom.sun.management.jmxremote.authenticate=false
+              -Dcom.sun.management.jmxremote.local.only=false
+            {{- end }}
+              {{- range $.Values.commandOps }}
+              {{ . }}
+              {{- end }}
+              -jar /opt/betack/{{ .Values.image.imgNameOrSvcName }}.jar
+          {{- end }}
+          ports:
+            {{- range $.Values.service.ports }}
+            - name: port{{ . }}
+              containerPort: {{ . }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.jmxremote.isopen }}
+            - name: port{{ .Values.jmxremote.ports }}
+              containerPort: {{ .Values.jmxremote.ports }}
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.isReadinessProbeEnabled }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.isLivenessProbeEnabled }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.envFrom.enabled }}
+          envFrom:
+          - secretRef:
+              name: {{ .Values.nameOverride }}-db-and-others-secret
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.storage.storageEnable }}
+          volumeMounts:
+            {{- if .Values.storage.isMountLogPV }}
+            - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-log
+              mountPath: /var/log
+            {{- end }}
+            {{- if or (eq .Values.storage.isMountDataPVType "empty") (eq .Values.storage.isMountDataPVType "pvc") }}
+            - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-{{ include "bf-java-project-deploy-common-v3.dataPVCNameInfix" . }}
+              mountPath: {{ .Values.storage.dataPVCMountPath }}
+            {{- end }}
+            {{- if .Values.storage.isMountMosekPV }}
+            - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-mosek
+              mountPath: /thirdparty/mosek
+            - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-mosek
+              mountPath: /iamusername/mosek
+            {{- end }}
+            {{- if .Values.storage.isMountAlonePV }}
+            - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-{{ include "bf-java-project-deploy-common-v3.aloneDataPVCNameInfix" . }}
+              mountPath: {{ .Values.storage.aloneDataPVCMountPath }}
+            {{- end }}
+          {{- end }}
+      dnsPolicy: ClusterFirst
+      {{- with .Values.dnsNameservers }}
+      dnsConfig:
+        nameservers:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.storage.storageEnable }}
+      volumes:
+        {{- if .Values.storage.isMountLogPV }}
+        - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-log
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-log-pvc
+        {{- end }}
+        {{- if eq .Values.storage.isMountDataPVType "empty" }}
+        - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-{{ include "bf-java-project-deploy-common-v3.dataPVCNameInfix" . }}
+          emptyDir:
+            sizeLimit: {{ .Values.storage.Capacity | default "50Gi" }}
+        {{- else if eq .Values.storage.isMountDataPVType "pvc" }}
+        - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-{{ include "bf-java-project-deploy-common-v3.dataPVCNameInfix" . }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-{{ include "bf-java-project-deploy-common-v3.dataPVCNameInfix" . }}-pvc
+        {{- end }}
+        {{- if .Values.storage.isMountMosekPV }}
+        - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-mosek
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-mosek-lib-license-pvc
+        {{- end }}
+        {{- if .Values.storage.isMountAlonePV }}
+        - name: {{ include "bf-java-project-deploy-common-v3.name" . }}-{{ include "bf-java-project-deploy-common-v3.aloneDataPVCNameInfix" . }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-{{ include "bf-java-project-deploy-common-v3.aloneDataPVCNameInfix" . }}-pvc
+        {{- end }}
+      {{- end }}
+

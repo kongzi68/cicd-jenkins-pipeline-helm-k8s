@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: **智能tougu服务AGI，python 项目通用 helm charts
+name: bf-python-project-deploy-common
+type: application
+version: "0.1.3"

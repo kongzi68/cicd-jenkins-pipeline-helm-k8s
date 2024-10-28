@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: bf distributed daemonset helm charts
+name: bf-java-project-distributed-daemonset
+type: application
+version: "0.1.1"

@@ -1,0 +1,11 @@
+apiVersion: v2
+appVersion: 5.7.43
+dependencies:
+- condition: backupMysqlDBCronjob.enabled
+  name: backupMysqlDBCronjob
+  repository: "file://../charts/backupMysqlDBCronjob"
+  version: "0.1.4"
+description: MySQL Database Server
+name: mysql-57
+type: application
+version: "0.1.11"

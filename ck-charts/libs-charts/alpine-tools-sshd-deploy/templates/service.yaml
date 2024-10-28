@@ -1,0 +1,21 @@
+{{ if .Values.service.isOut }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "alpine-tools-sshd-deploy.name" . }}-out-{{ include "alpine-tools-sshd-deploy.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "alpine-tools-sshd-deploy.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  ports:
+    {{- range $.Values.service.ports }}
+    - port: {{ . }}
+      targetPort: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+  selector:
+    {{- include "alpine-tools-sshd-deploy.selectorLabels" . | nindent 4 }}
+{{ end }}
+

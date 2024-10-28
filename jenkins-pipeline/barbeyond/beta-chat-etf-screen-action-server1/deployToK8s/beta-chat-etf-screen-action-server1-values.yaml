@@ -1,0 +1,97 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: beta-chat-etf-screen-action-server1
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称，
+  imgNameOrSvcName: beta-chat-etf-screen-action-server1
+  imgHarbor: IAmIPaddress:8765
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: rabbeyond
+  # repository: IAmIPaddress:8765/rabbeyond/beta-chat-etf-screen-action-server1
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+storage:
+  storageEnable: true
+  ## 二进制数据存储
+  isCreateDataPVC: true
+  isMountDataPV: true
+  #+ 设置为空的时候，默认创建 300Gi
+  # capacity: ""
+  capacity: "120Gi"
+  # PVC名称加中缀，特殊情况下使用，默认可设置为空，即''
+  dataPVCNameInfix: 'etf-screen-action1'
+  dataPVCMountPath: /opt/betachat/embed_db_dir
+  dataStorageClassName: nfs-client-retain
+  ## 日志存储，挂载日志存储路径：/var/log
+  isCreateLogPVC: false
+  isMountLogPV: false
+  logStorageClassName: nfs-client-retain
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [5055] # 容器需要启动的端口
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+### isCommand 
+#+ 或者是都设置为false，即不设置 command，此时默认用镜像中的command
+## 用于直接指定command的项目
+isCommand: true
+# command: 'ls -lha; poetry shell; poetry run poe run'
+command: 'ls -lha; python -m endpoint'
+
+## 注入为环境变量
+isConfigMapENV: true
+configMapENVYaml: 
+  QUESTION_TOOL_QUERY_POLICY: "by_experience"
+  SANIC_REQUEST_TIMEOUT: "1000"
+  SANIC_RESPONSE_TIMEOUT: "1000"
+  UNIVERSE_COLLECTION_NAME: "new_demo_asset_tag_info"
+  HTTPS_PROXY: "http://shadowsocks-rust:8388"
+  QDRANT_HOST: "http://IAmIPaddress"
+  QDRANT_KEY: "password"
+  OPENAI_KEY: "sk-01321646+49+46+4313130320303"
+  OPENAI_API_KEY: "sk-01321646+49+46+4313130320303"
+  OPENAI_TOKEN: "sk-01321646+49+46+4313130320303"
+  RAG_HOST: "http://IAmIPaddress:8099/search"
+  SFINX_FUND_HOST: "http://equity-fund-uat.betack.com"
+  SFINX_ETF_HOST: "http://etf-uat.betack.com"
+  SFINX_BOND_HOST: "http://bond-fund-uat.betack.com"
+  RUST_LOG: "INFO"
+  rab_HOST: "http://IAmIPaddress:31773"
+  PYTHONUNBUFFERED: "1"
+  SEARCH_API_KEY: "this is test secret"
+  CLAUDE_API_KEY: "this-is-test-secret!!!!"
+  rab_TOKEN: 'Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.iam-secretsaaaaaaaaaaaaaaaaaaaaaa.MlIV2byXs05WmwnoMX253gav23rB96-rzIZwBsn_Zlyjov31Ooi_1ddfNCo_zXUyzjNZTnD5hkiKQmEBk_DQCMNXGJe1UNuflpYZmF9ZWhX5r5TnX3JXOTKwRulu2IGZZIDG2IoB7o5X8NcMBAXVeOzRPYJXGUUQrhpgfMrRHomwR85HMzFhCSSS8PnRBhJEORW8rM7wWAj0EHuYMEJrXGDteXf5-1hFUvt4Wa7vapRMlQCKC_hbU3ICNU3TG7edsXtSYvJJmvDNGxdCIC1pxN2CdF-mwm5O2irVMCDbUDBOAWT9uQwCzgE4RbVXyLfIyvIu63bErFXZZ058maREnw'
+

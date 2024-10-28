@@ -1,0 +1,55 @@
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: data-migration-job
+namespacePrefix: 'NAMESPACEPREFIX-'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称
+  imgNameOrSvcName: data-migration-job
+  imgHarbor: IAmIPaddress
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: bf-bsc
+  # repository: IAmIPaddress/bf-bsc/data-migration-job
+  pullPolicy: IfNotPresent
+  tag: IMAGE_TAG
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+storage:
+  isMountPV: false
+  dataPVCMountPath: /opt/rab_backend/data
+  ## 默认会挂载日志路径：/var/log
+  #+ 以及mosek的路径：/thirdparty/mosek，/iamusername/mosek
+  ## 有些服务，除了需要挂载api的data pv卷，还需要自己独立的pv卷
+  isMountAlonePV: false
+  aloneDataPVCMountPath: /opt/rab_backend/data/rabbeyond
+
+securityContext: {}
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# commands: "java -Dspring.profiles.active=CONFIG_ENV -DLOG_BASE_PATH=/var/log -jar /opt/betack/data-migration-job.jar"
+## 设置服务的启动参数
+#+ 服务的jar包名称等
+commandOps:
+  - -Dspring.profiles.active=CONFIG_ENV
+  - -DLOG_BASE_PATH=/var/log
+  #- -jar /opt/betack/rab-task-data-migration-5582a203-156.jar
+#+ job 服务启动时，jar 包后面带的选项
+svcJARPKGOptions: data-meta-import-job-OPTIONS

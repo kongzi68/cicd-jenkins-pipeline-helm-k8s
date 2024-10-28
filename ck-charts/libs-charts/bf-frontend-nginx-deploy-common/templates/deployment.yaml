@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bf-frontend-nginx-deploy-common.fullname" . }}-{{ include "bf-frontend-nginx-deploy-common.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-frontend-nginx-deploy-common.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "bf-frontend-nginx-deploy-common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bf-frontend-nginx-deploy-common.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.image.imgNameOrSvcName }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.imgHarbor }}/{{ .Values.image.harborProject }}/{{ .Values.image.imgNameOrSvcName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            {{- range $.Values.service.ports }}
+            - name: port-{{ . }}
+              containerPort: {{ . }}
+              protocol: TCP
+            {{- end }}
+          # {{- if .Values.isReadinessProbeEnabled }}
+          # {{- with .Values.readinessProbe }}
+          # readinessProbe:
+          #   {{- toYaml . | nindent 12 }}
+          # {{- end }}
+          # {{- end }}
+          # {{- if .Values.isLivenessProbeEnabled }}
+          # {{- with .Values.livenessProbe }}
+          # livenessProbe:
+          #   {{- toYaml . | nindent 12 }}
+          # {{- end }}
+          # {{- end }}
+          {{- if .Values.isReadinessProbeEnabled }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.isLivenessProbeEnabled }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: web-conf
+            mountPath: /etc/nginx/conf.d/default.conf
+            subPath: default.conf
+          - name: nginx-conf
+            mountPath: /etc/nginx/nginx.conf
+            subPath: nginx.conf
+          {{- if .Values.isAuthPasswd }}
+          - name: auth-passwd
+            mountPath: /var/www/auth/passwd
+            subPath: passwd
+          {{- end }}
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        nameservers:
+        - IAmIPaddress
+        - IAmIPaddress
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: nginx-conf
+        configMap:
+          name: {{ .Values.nameOverride }}-nginx-conf
+      - name: web-conf
+        configMap:
+          name: {{ .Values.nameOverride }}-nginx-web-conf
+      {{- if .Values.isAuthPasswd }}
+      - name: auth-passwd
+        configMap:
+          name: {{ .Values.nameOverride }}-nginx-authpasswd
+      {{- end }}

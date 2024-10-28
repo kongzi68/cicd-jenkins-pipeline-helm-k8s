@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: bf distributed StatefulSet helm charts
+name: bf-java-project-distributed-statefulset
+type: application
+version: "0.1.3"

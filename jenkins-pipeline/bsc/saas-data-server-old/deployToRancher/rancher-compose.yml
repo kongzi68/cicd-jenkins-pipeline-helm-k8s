@@ -1,0 +1,20 @@
+version: '2'
+services:
+  saas-data-server:
+    scale: 1
+    start_on_create: true
+  data-subscriber-client:
+    scale: 1
+    start_on_create: true
+  etl-listener:
+    scale: 1
+    start_on_create: true
+  data-migration-job:
+    scale: 1
+    start_on_create: true
+  data-meta-import-job:
+    scale: 1
+    start_on_create: true
+  mysql:
+    scale: 1
+    start_on_create: true

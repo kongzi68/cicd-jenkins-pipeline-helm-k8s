@@ -1,0 +1,145 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bf-java-project-deploy-common-v2.fullname" . }}-{{ include "bf-java-project-deploy-common-v2.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-deploy-common-v2.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "bf-java-project-deploy-common-v2.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bf-java-project-deploy-common-v2.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.image.imgNameOrSvcName }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.imgHarbor }}/{{ .Values.image.harborProject }}/{{ .Values.image.imgNameOrSvcName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.isCommand }}
+          command:
+            - /bin/sh
+            - -c
+            - {{ .Values.command }}
+          {{- else if .Values.isCommandOps }}
+          command: 
+            - /bin/sh
+            - '-c'
+            - >-
+              java
+            {{- if .Values.jmxremote.isopen }}
+              -Dcom.sun.management.jmxremote
+              -Dcom.sun.management.jmxremote.port={{ .Values.jmxremote.ports }}
+              -Dcom.sun.management.jmxremote.rmi.port={{ .Values.jmxremote.ports }}
+              -Djava.rmi.server.hostname={{ .Values.jmxremote.hostnameIp }}
+              -Dcom.sun.management.jmxremote.ssl=false
+              -Dcom.sun.management.jmxremote.authenticate=false
+              -Dcom.sun.management.jmxremote.local.only=false
+            {{- end }}
+              {{- range $.Values.commandOps }}
+              {{ . }}
+              {{- end }}
+              -jar /opt/betack/{{ .Values.image.imgNameOrSvcName }}.jar
+          {{- end }}
+          ports:
+            {{- range $.Values.service.ports }}
+            - name: port{{ . }}
+              containerPort: {{ . }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.jmxremote.isopen }}
+            - name: port{{ .Values.jmxremote.ports }}
+              containerPort: {{ .Values.jmxremote.ports }}
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.isReadinessProbeEnabled }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.isLivenessProbeEnabled }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.envFrom.enabled }}
+          envFrom:
+          - secretRef:
+              name: {{ .Values.nameOverride }}-db-and-others-secret
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.storage.storageEnable }}
+          volumeMounts:
+            {{- if .Values.storage.isMountLogPV }}
+            - name: {{ include "bf-java-project-deploy-common-v2.name" . }}-log
+              mountPath: /var/log
+            {{- end }}
+            {{- if .Values.storage.isMountHostPath }}
+            - name: {{ include "bf-java-project-deploy-common-v2.name" . }}-data
+              mountPath: {{ .Values.storage.HostPathMountPath }}
+            {{- end }}
+            {{- if .Values.storage.isMountMosekPV }}
+            - name: {{ include "bf-java-project-deploy-common-v2.name" . }}-mosek
+              mountPath: /thirdparty/mosek
+            - name: {{ include "bf-java-project-deploy-common-v2.name" . }}-mosek
+              mountPath: /iamusername/mosek
+            {{- end }}
+          {{- end }}
+      dnsPolicy: ClusterFirst
+      {{- with .Values.dnsNameservers }}
+      dnsConfig:
+        nameservers:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nodeName }}
+      nodeName: {{ .Values.nodeName }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.storage.storageEnable }}
+      volumes:
+        {{- if .Values.storage.isMountLogPV }}
+        - name: {{ include "bf-java-project-deploy-common-v2.name" . }}-log
+          hostPath:
+            path: /data2t/{{ .Release.Namespace }}/log
+            type: DirectoryOrCreate
+        {{- end }}
+        {{- if .Values.storage.isMountHostPath }}
+        - name: {{ include "bf-java-project-deploy-common-v2.name" . }}-data
+          hostPath:
+            path: /data2t/{{ .Release.Namespace }}/data
+            type: DirectoryOrCreate
+        {{- end }}
+        {{- if .Values.storage.isMountMosekPV }}
+        - name: {{ include "bf-java-project-deploy-common-v2.name" . }}-mosek
+          hostPath:
+            path: /data2t/{{ .Release.Namespace }}/mosek
+            type: DirectoryOrCreate
+        {{- end }}
+      {{- end }}

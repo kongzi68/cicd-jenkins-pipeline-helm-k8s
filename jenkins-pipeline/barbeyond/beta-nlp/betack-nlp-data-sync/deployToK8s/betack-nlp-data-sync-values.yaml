@@ -1,0 +1,123 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: beta-nlp
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称，
+  imgNameOrSvcName: beta-nlp
+  imgHarbor: IAmIPaddress:8765
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: rabbeyond
+  # repository: IAmIPaddress:8765/rabbeyond/beta-nlp
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+
+storage:
+  storageEnable: true
+  ## 二进制数据存储
+  isCreateDataPVC: true
+  isMountDataPV: true
+  #+ 设置为空的时候，默认创建 300Gi
+  capacity: "10Gi"
+  # capacity: 500Gi
+  dataPVCMountPath: /opt/betack/data_sync
+  dataStorageClassName: nfs-client-retain
+  ## 日志存储，挂载日志存储路径：/var/log
+  isCreateLogPVC: false
+  isMountLogPV: false
+  logStorageClassName: longhorn-slow-replica1
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [8099, 9961] # 容器需要启动的端口
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+### isCommand 
+#+ 或者是都设置为false，即不设置 command，此时默认用镜像中的command
+## 用于直接指定command的项目
+isCommand: true
+command: 'ls -lh; ./SVCSTARTNAME --path config.yaml'
+
+## config.yaml 配置文件
+configYaml: |-
+    sfinx_fund: http://equity-fund-uat.betack.com
+    sfinx_etf: http://etf-uat.betack.com
+    sfinx_bond: http://bond-fund-uat.betack.com
+    rab_host: http://IAmIPaddress:31773
+    rab_api_token: >
+      Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.iam-secretsaaaaaaaaaaaaaaaaaaaaaa.MlIV2byXs05WmwnoMX253gav23rB96-rzIZwBsn_Zlyjov31Ooi_1ddfNCo_zXUyzjNZTnD5hkiKQmEBk_DQCMNXGJe1UNuflpYZmF9ZWhX5r5TnX3JXOTKwRulu2IGZZIDG2IoB7o5X8NcMBAXVeOzRPYJXGUUQrhpgfMrRHomwR85HMzFhCSSS8PnRBhJEORW8rM7wWAj0EHuYMEJrXGDteXf5-1hFUvt4Wa7vapRMlQCKC_hbU3ICNU3TG7edsXtSYvJJmvDNGxdCIC1pxN2CdF-mwm5O2irVMCDbUDBOAWT9uQwCzgE4RbVXyLfIyvIu63bErFXZZ058maREnw
+    
+    sync_server_port: 9961
+    persist_sync:
+      qdrant:
+        qdrant_host: http://IAmIPaddress:32631
+        qdrant_key: password
+        rag_host: http://IAmIPaddress:8099
+        #rag_host: http://IAmIPaddress:32383
+
+    # 设置为true时会在正常的collection后面加上_sync_test后缀，然后删除该集合。主要用于跑流程测试。
+    be_run_test: false
+    test_collection_postfix: _sync_test
+
+    etf_lof: demo_etf_lof
+    # 只包含tag
+    tag: new_demo_asset_tag_info
+
+    #只包含因子: 暂时没有计划同步，但是先留着
+    factor: demo_factor_info
+
+    #A股所有基金
+    all_a_fund: demo_all_a_fund_meta_info
+
+    #目前只包含Sfinx预分类的普通基金
+    bench_mark: demo_bench_mark_info
+
+    # Sfinx预分类的普通基金，债券、ETF和普通基金
+    fund_type_meta: demo_fund_meta_info
+
+    # 只包含股票
+    stock: demo_stock_info
+
+    # 大盘指数目前是代码中手动指定的
+    universe: demo_position_universe
+
+    # 排除股票
+    topic_universe: demo_topic_position_universe
+
+    # 只有行业
+    industry: demo_industry_info
+
+    file_persist_log: ./data_sync

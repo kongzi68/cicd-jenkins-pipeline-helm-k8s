@@ -1,0 +1,80 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "backup-mysql-db.fullname" . }}-{{ include "backup-mysql-db.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backup-mysql-db.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          initContainers:
+          - name: mysqldump-sql
+            image: {{ .Values.image.imgMysql }}
+            command:
+              - /bin/sh
+              - -c
+              - "cd /opt/betack && bash bak_mysql_db.sh"
+            env:
+              - name: MYSQL_SVC_NAME
+                value: {{ .Values.mysql.svcName }}
+              - name: MY_POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+            volumeMounts:
+              - name: workdir
+                mountPath: /opt/betack
+              - name: {{ include "backup-mysql-db.name" . }}-dbbak-script
+                mountPath: /opt/betack/bak_mysql_db.sh
+                subPath: bak_mysql_db.sh
+              - name: {{ include "backup-mysql-db.name" . }}-mysql-secret
+                mountPath: /iamusername/my.password
+                subPath: my.password
+                readOnly: true
+          containers:
+          - name: rsync-bak-to-storage-server
+            image: {{ .Values.image.imgAlpineTools }}
+            imagePullPolicy: Always
+            command:
+              - /bin/sh
+              - -c
+              - cd /opt/betack && bash scp_bakpkg_to_storage_server.sh
+            env:
+              - name: MY_POD_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+            volumeMounts:
+              - name: workdir
+                mountPath: /opt/betack
+              - name: {{ include "backup-mysql-db.name" . }}-scp-script
+                mountPath: /opt/betack/scp_bakpkg_to_storage_server.sh
+                subPath: scp_bakpkg_to_storage_server.sh
+            envFrom:
+              - secretRef:
+                  name: {{ .Values.nameOverride }}-storage-server-secret
+          restartPolicy: OnFailure
+          dnsConfig:
+            nameservers:
+            - IAmIPaddress
+            - IAmIPaddress
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumes:
+            - name: workdir
+              emptyDir: {}
+            - name: {{ include "backup-mysql-db.name" . }}-dbbak-script
+              configMap:
+                name: {{ .Values.nameOverride }}-dbbak-script
+            - name: {{ include "backup-mysql-db.name" . }}-scp-script
+              configMap:
+                name: {{ .Values.nameOverride }}-scp-script
+            - name: {{ include "backup-mysql-db.name" . }}-mysql-secret
+              secret:
+                secretName: {{ .Values.nameOverride }}-mysql-secret

@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-java-project-distributed-statefulset.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-distributed-statefulset.labels" . | nindent 4 }}
+spec:
+  ports:
+    {{- range $.Values.headlessServices.ports }}
+    - port: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+  clusterIP: None
+  selector:
+    {{- include "bf-java-project-distributed-statefulset.selectorLabels" . | nindent 4 }}
+
+---
+
+{{ if .Values.service.isIn }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-java-project-distributed-statefulset.name" . }}-in-{{ include "bf-java-project-distributed-statefulset.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-distributed-statefulset.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    {{- range $.Values.service.ports }}
+    - port: {{ . }}
+      targetPort: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+  selector:
+    {{- include "bf-java-project-distributed-statefulset.selectorLabels" . | nindent 4 }}
+{{ end }}
+
+---
+
+{{ if .Values.service.isOut }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-java-project-distributed-statefulset.name" . }}-out-{{ include "bf-java-project-distributed-statefulset.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-distributed-statefulset.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  ports:
+    {{- range $.Values.service.ports }}
+    - port: {{ . }}
+      targetPort: {{ . }}
+      protocol: TCP
+      name: port{{ . }}
+    {{- end }}
+  selector:
+    {{- include "bf-java-project-distributed-statefulset.selectorLabels" . | nindent 4 }}
+{{ end }}
+
+---
+
+{{ if .Values.jmxremote.isopen }}
+#+ 用于java项目开启jmxremote调试功能
+#+ 需要指定 nodePort 端口为容器中 jmx 指定的端口
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "bf-java-project-distributed-statefulset.name" . }}-jmxremote-{{ include "bf-java-project-distributed-statefulset.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-distributed-statefulset.labels" . | nindent 4 }}
+spec:
+  type: NodePort
+  ports:
+    - port: {{ .Values.jmxremote.ports }}
+      targetPort: {{ .Values.jmxremote.ports }}
+      protocol: TCP
+      nodePort: {{ .Values.jmxremote.ports }}
+      name: port{{ .Values.jmxremote.ports }}
+  selector:
+    {{- include "bf-java-project-distributed-statefulset.selectorLabels" . | nindent 4 }}
+{{ end }}
+ 

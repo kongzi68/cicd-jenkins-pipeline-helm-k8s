@@ -1,0 +1,184 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "bf-java-project-deploy-common.fullname" . }}-{{ include "bf-java-project-deploy-common.namespacesPrefix" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "bf-java-project-deploy-common.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "bf-java-project-deploy-common.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "bf-java-project-deploy-common.selectorLabels" . | nindent 8 }}
+        {{- if .Values.akka.enabled }}
+        {{- toYaml .Values.akka.akkalable | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Values.image.imgNameOrSvcName }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.imgHarbor }}/{{ .Values.image.harborProject }}/{{ .Values.image.imgNameOrSvcName }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.isCommand }}
+          command:
+            - /bin/sh
+            - -c
+            - {{ .Values.command }}
+          {{- else if .Values.isCommandOps }}
+          command: 
+            - /bin/sh
+            - '-c'
+            - >-
+              java
+            {{- if .Values.jmxremote.isopen }}
+              -Dcom.sun.management.jmxremote
+              -Dcom.sun.management.jmxremote.port={{ .Values.jmxremote.ports }}
+              -Dcom.sun.management.jmxremote.rmi.port={{ .Values.jmxremote.ports }}
+              -Djava.rmi.server.hostname={{ .Values.jmxremote.hostnameIp }}
+              -Dcom.sun.management.jmxremote.ssl=false
+              -Dcom.sun.management.jmxremote.authenticate=false
+              -Dcom.sun.management.jmxremote.local.only=false
+            {{- end }}
+            {{- if .Values.akka.enabled }}
+              {{- range $.Values.akka.akkaJavaOps }}
+              {{ . }}
+              {{- end }}
+            {{- end }}
+              {{- range $.Values.commandOps }}
+              {{ . }}
+              {{- end }}
+              -jar /opt/betack/{{ .Values.image.imgNameOrSvcName }}.jar
+          {{- end }}
+          ports:
+            {{- range $.Values.service.ports }}
+            - name: port{{ . }}
+              containerPort: {{ . }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.akka.enabled }}
+            {{- range $.Values.akka.akkaPort }}
+            - name: port{{ . }}
+              containerPort: {{ . }}
+              protocol: TCP
+            {{- end }}
+            {{- end }}
+            {{- if .Values.jmxremote.isopen }}
+            - name: port{{ .Values.jmxremote.ports }}
+              containerPort: {{ .Values.jmxremote.ports }}
+              protocol: TCP
+            {{- end }}
+          {{- if .Values.isReadinessProbeEnabled }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- else if .Values.akka.enabled }}
+          readinessProbe:
+            {{- toYaml .Values.akka.akkaProbe.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.isLivenessProbeEnabled }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- else if .Values.akka.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.akka.akkaProbe.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.envFrom.enabled .Values.akka.enabled }}
+          envFrom:
+          - secretRef:
+              name: {{ .Values.nameOverride }}-db-and-others-secret
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- if or .Values.storage.storageEnable .Values.akka.enabled }}
+          volumeMounts:
+            {{- if .Values.storage.isMountLogPV }}
+            - name: {{ include "bf-java-project-deploy-common.name" . }}-log
+              mountPath: /var/log
+            {{- end }}
+            {{- if or (eq .Values.storage.isMountDataPVType "empty") (eq .Values.storage.isMountDataPVType "pvc") }}
+            - name: {{ include "bf-java-project-deploy-common.name" . }}-data
+              mountPath: {{ .Values.storage.dataPVCMountPath }}
+            {{- end }}
+            {{- if .Values.storage.isMountMosekPV }}
+            - name: {{ include "bf-java-project-deploy-common.name" . }}-mosek
+              mountPath: /thirdparty/mosek
+            - name: {{ include "bf-java-project-deploy-common.name" . }}-mosek
+              mountPath: /iamusername/mosek
+            {{- end }}
+            {{- if .Values.storage.isMountAlonePV }}
+            - name: {{ include "bf-java-project-deploy-common.name" . }}-data-alone
+              mountPath: {{ .Values.storage.aloneDataPVCMountPath }}
+            {{- end }}
+            {{- if .Values.akka.enabled }}
+            - name: {{ include "bf-java-project-deploy-common.name" . }}-akka-cluster-conf
+              mountPath: {{ .Values.akka.akkaClusterConfMountPath }}
+              subPath: {{ .Values.akka.akkaClusterConfSubPath }}
+            {{- end }}
+          {{- end }}
+      dnsPolicy: ClusterFirst
+      {{- with .Values.dnsNameservers }}
+      dnsConfig:
+        nameservers:
+          {{- toYaml . | nindent 10 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.storage.storageEnable .Values.akka.enabled }}
+      volumes:
+        {{- if .Values.storage.isMountLogPV }}
+        - name: {{ include "bf-java-project-deploy-common.name" . }}-log
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-log-pvc
+        {{- end }}
+        {{- if eq .Values.storage.isMountDataPVType "empty" }}
+        - name: {{ include "bf-java-project-deploy-common.name" . }}-data
+          emptyDir:
+            sizeLimit: {{ .Values.storage.Capacity | default "50Gi" }}
+        {{- else if eq .Values.storage.isMountDataPVType "pvc" }}
+        - name: {{ include "bf-java-project-deploy-common.name" . }}-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-{{ include "bf-java-project-deploy-common.dataPVCNameInfix" . }}data-pvc
+        {{- end }}
+        {{- if .Values.storage.isMountMosekPV }}
+        - name: {{ include "bf-java-project-deploy-common.name" . }}-mosek
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-mosek-lib-license-pvc
+        {{- end }}
+        {{- if .Values.storage.isMountAlonePV }}
+        - name: {{ include "bf-java-project-deploy-common.name" . }}-data-alone
+          persistentVolumeClaim:
+            claimName: {{ .Release.Namespace }}-{{ include "bf-java-project-deploy-common.aloneDataPVCNameInfix" . }}data-alone-pvc
+        {{- end }}
+        {{- if .Values.akka.enabled }}
+        - name: {{ include "bf-java-project-deploy-common.name" . }}-akka-cluster-conf
+          configMap:
+            name: {{ .Values.nameOverride }}-akka-cluster-conf
+        {{- end }}
+      {{- end }}
+

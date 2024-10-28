@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.nameOverride }}-akka-cluster-conf
+data:
+  akka-config.conf: |-
+    {{- .Values.akka.akkaClusterConf | nindent 4}}

@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: sshpass、ansible、rsync、sshd等工具集
+name: alpine-tools-sshd-deploy
+type: application
+version: "0.1.5"

@@ -1,0 +1,31 @@
+{{ if .Values.storage.isCreateDataPVC }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-{{ include "bf-python-project-deploy-common.dataPVCNameInfix" . }}data-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.storage.capacity | default "300Gi" }}
+  storageClassName: {{ .Values.storage.dataStorageClassName }}
+{{ end }}
+
+---
+{{ if .Values.storage.isCreateLogPVC }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-log-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 80Gi
+  storageClassName: {{ .Values.storage.logStorageClassName }}
+{{ end }}
+

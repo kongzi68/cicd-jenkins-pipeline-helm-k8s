@@ -1,0 +1,128 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: beta-nlp
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称，
+  imgNameOrSvcName: beta-nlp
+  imgHarbor: IAmIPaddress:8765
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: rabbeyond
+  # repository: IAmIPaddress:8765/rabbeyond/beta-nlp
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+storage:
+  storageEnable: false
+  ## 二进制数据存储
+  isCreateDataPVC: false
+  isMountDataPV: false
+  #+ 设置为空的时候，默认创建 300Gi
+  capacity: ""
+  # capacity: 500Gi
+  dataPVCMountPath: /opt/betack/data
+  dataStorageClassName: longhorn-slow-replica1
+  ## 日志存储，挂载日志存储路径：/var/log
+  isCreateLogPVC: false
+  isMountLogPV: false
+  logStorageClassName: longhorn-slow-replica1
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [8099] # 容器需要启动的端口
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+### isCommand 
+#+ 或者是都设置为false，即不设置 command，此时默认用镜像中的command
+## 用于直接指定command的项目
+isCommand: true
+command: 'echo "IAmIPaddress api4.betack.com" >> /etc/hosts; ls -lh; ./SVCSTARTNAME --path config.yaml'
+
+## config.yaml 配置文件
+configYaml: |-
+    server_port: 8099
+    show_warmup_prompt: true
+    model: "gpt-3.5-turbo"
+    min_tokens_for_completion: 512
+    max_tokens: 1024
+    rab:
+      #http://ci.betack.com:62176
+      host: "http://api4.betack.com:82"
+      #host: "http://IAmIPaddress:82"
+      user: "chenyouguo@betack.com"
+      password: "rab888888"
+    openai:
+      api_version: "2023-03-15-preview"
+      gpt_3_5_deployment_id: "betack"
+      embed_api_version: "2023-05-15"
+      embed_deployment_id: "emb-betack"
+      api_base: "https://betack.openai.azure.com"
+      api_key: "80d2b50f9b1a410d9b9fd6799fe7e8bf"
+    qdrant_client:
+    #  host: "http://localhost:6334"
+      host: "http://IAmIPaddress:39613"
+      api_key: "password"
+    persist_config:
+      type: "Memory"
+      meta:
+        redis_connect_url: "redis://localhost:6379/1"
+    tool_api:
+      macro_market_api: "http://api4.betack.com:84/api/etf/compass/market_macro_summary"
+    #  1. Default包含所有工具。 2. 至少配置一个分类. 3. 不包括terminal和advance tool
+    tool_category_config:
+      enable_category_before_task: false
+      tool_category_describe:
+        #  宏观市场
+        - name: "MarketInfo"
+          prompt_describe: "ETF macro market information"
+          tools: 
+            - "ETFMoneyTrend"
+            - "EtfMacroMarketInfoTool"
+        # 回测和分析
+        - name: "BackTestAndAnalysis"
+          prompt_describe: "Etf back test, risk analysis"
+          tools: 
+            - "AssetOptimizerTool"
+            - "RiskAnalysisTool"  
+            - "StockScreenTool"  
+        # ETF筛选和查询
+        - name: "Select"
+          prompt_describe: "ETF selection, search but cannot query alternate found"
+          tools: 
+            - "EtfScreenByStockPositionTool"
+            - "ETFScreenTool"
+        # 替换
+        - name: "FundAlternate"
+          prompt_describe: "ETF alternate"
+          tools: 
+            - "QueryAlternateEtfFundTool"  

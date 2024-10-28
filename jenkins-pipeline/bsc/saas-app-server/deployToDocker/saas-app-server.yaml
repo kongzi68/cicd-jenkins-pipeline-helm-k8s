@@ -1,0 +1,18 @@
+- name: deploy saas-app-server
+  hosts: "IAmIPaddress"
+  gather_facts: no
+  tasks:
+    - name: Restart a container
+      docker_container:
+        name: bsc-saas-app-server
+        image: harbor.betack.com/bf-bsc/saas-app-server:IMAGE_TAG
+        state: started
+        restart: yes
+        ports:
+        # Publish container port 50053 as host port 50050
+        #- "50050:50053"
+        - "51001:8080"
+        - "51002:9090"
+        volumes:
+          - /data1t/bsc-data/bsc-rabbeyond:/opt/saas_commons/data
+        command: ["java", "-Dspring.profiles.active=external-test", "--add-opens=java.base/java.nio=ALL-UNNAMED", "-jar", "/opt/betack/saas-app-server-IMAGE_TAG.jar"]

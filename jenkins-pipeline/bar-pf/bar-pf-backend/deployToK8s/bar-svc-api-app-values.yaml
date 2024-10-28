@@ -1,0 +1,79 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: rab-svc-api-app
+namespacePrefix: 'NAMESPACEPREFIX-'
+
+image:
+  repository: IAmIPaddress:8765/rab-pf/rab-svc-api-app
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+storage:
+  ## 设置为空的时候，默认创建 300Gi
+  # capacity: ""
+  capacity: 500Gi
+  dataStorageClassName: nfs-client-retain
+  mosekStorageClassName: nfs-client-retain
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [5005, 8080, 9099, 9999, 12233] # 容器需要启动的端口
+
+## 设置是否开启jmxremote调试
+#+ isopen 为 true，表示创建 NodePort 类型的service；fasle 表示不创建
+#+ ports: 31099，这个31099既是jmxremote的端口，同时也是NodePort的端口
+#+ hostnameIp 是k8s集群节点的ip
+jmxremote:
+  isopen: JMX_REMOTE
+  ports: JMX_NODEPORT
+  hostnameIp: 'IAmIPaddress'
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+## 设置服务的启动参数
+#+ 服务的jar包名称等
+commandOps:
+  - -Dspring.profiles.active=CONFIG_ENV
+  - -DLOG_BASE_PATH=/var/log
+  - --add-opens=java.base/java.nio=ALL-UNNAMED
+  - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+  - -Dloader.path=/thirdparty/mosek/
+  - -Djava.library.path=/thirdparty/mosek/
+  - -Dstore.dataInMemory=false
+  - -Dstore.financialStatement.betack.dataInMemory=false
+  - -Dstore.financialStatement.gta.dataInMemory=false
+  - -Dstore.from=2005-01-04
+  - -Duse.data.store=rabbeyond
+  - -jar /opt/betack/rab-svc-api-app-IMAGE_TAG.jar

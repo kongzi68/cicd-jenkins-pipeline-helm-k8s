@@ -1,0 +1,9 @@
+# 注入为环境变量
+{{ if .Values.isConfigMapENV }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.nameOverride }}-configmap-env
+data: 
+  {{- toYaml .Values.configMapENVYaml | nindent 2 }}
+{{ end }}

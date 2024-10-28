@@ -1,0 +1,205 @@
+replicaCount: REPLICA_COUNT
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: rab-svc-api-app
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称，
+  imgNameOrSvcName: rab-svc-api-app
+  imgHarbor: IAmIPaddress:8765
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: rab
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+storage:
+  storageEnable: true
+  ## 二进制数据存储
+  #+ 若 isMountDataPVType 的值为 pvc 同时又需要创建 dataPV 卷时，isCreateDataPVC 应设置为 true；
+  #+ 否则其它情况一律设置为 false
+  isCreateDataPVC: IS_CREATE_DATA_PVC
+  # 指定挂载的卷类型
+  #+ 若 isMountDataPVType 的值为 empty；此时 isCreateDataPVC 应设置为 false
+  #+ isMountDataPVType 的值可选: empty pvc nil
+  #++ pvc   表示使要 pvc 创建 pv 卷
+  #++ empty 表示使用 emptyDir
+  #++ nil   表示不挂载该卷
+  isMountDataPVType: 'MOUNT_DATA_PV_TYPE'
+  #+ 设置为空的时候，默认创建 500Gi
+  # capacity: ""
+  capacity: PV_SIZE
+  # PVC名称加中缀，特殊情况下使用，默认可设置为空，即''
+  dataPVCNameInfix: ''
+  dataPVCMountPath: TT_DATA_PVC_MOUNT_PATH
+  dataStorageClassName: DATASTORAGECLASSNAME
+  ## 日志存储，挂载日志存储路径：/var/log
+  isCreateLogPVC: true
+  isMountLogPV: true
+  logStorageClassName: DATASTORAGECLASSNAME
+  ## mosek，挂载路径：/thirdparty/mosek，/iamusername/mosek
+  isCreateMosekPVC: true
+  isMountMosekPV: true
+  mosekStorageClassName: DATASTORAGECLASSNAME
+  ## 有些服务，除了需要挂载api的data pv卷，还需要自己独立的pv卷
+  isCreateAlonePVC: IS_CREATE_ALONE_PVC
+  isMountAlonePV: IS_MOUNT_ALONE_PV
+  #+ 设置为空的时候，默认创建 300Gi
+  aloneCapacity: "ALONE_CAPACITY"
+  aloneDataPVCMountPath: ALONE_DATA_PVC_MOUNT_PATH
+  aloneDataStorageClassName: DATASTORAGECLASSNAME
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: true
+  isOut: true
+  ports: [5005, 8080, 9099, 9999, 12233, 25251, 50053, 50060] # 容器需要启动的端口
+
+## 设置是否开启jmxremote调试
+#+ isopen 为 true，表示创建 NodePort 类型的service；fasle 表示不创建
+#+ ports: 31099，这个31099既是jmxremote的端口，同时也是NodePort的端口
+#+ hostnameIp 是k8s集群节点的ip
+jmxremote:
+  isopen: JMX_REMOTE
+  ports: JMX_NODEPORT
+  hostnameIp: JMX_NODEIP
+
+resources: 
+  requests:
+    cpu: '4'
+    memory: 30Gi
+
+## 通过secret注入环境变量
+#+ 启用akka集群的时候，会自动加入它相应的环境变量
+envFrom:
+  enabled: false
+  environmentVariable: {}
+
+dnsNameservers: []
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+## 此就绪探针与存活探针不能与akka集群的探针同时启用
+#+ isReadinessProbeEnabled为true时表示启用此处的探针，此时akka的探针将会失效
+isReadinessProbeEnabled: false
+readinessProbe: {}
+  #tcpSocket:
+  #  port: 8080
+  #initialDelaySeconds: 5
+  #periodSeconds: 10
+#+ 存活探针，isLivenessProbeEnabled为true时表示启用此处的探针，此时akka的探针将会失效
+isLivenessProbeEnabled: false
+livenessProbe: {}
+  #tcpSocket:
+  #  port: 8080
+  #initialDelaySeconds: 15
+  #periodSeconds: 20
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+### isCommand 与 isCommandOps 二选一，将替换镜像中的command
+#+ 或者是都设置为false，即不设置 command，此时默认用镜像中的command
+## 用于直接指定command的项目
+isCommand: false
+command: ''
+
+## 设置服务的启动参数
+isCommandOps: true
+# commandOps:
+#   - -Dspring.profiles.active=CONFIG_ENV
+#   - -DLOG_BASE_PATH=/var/log
+#   - --add-opens=java.base/java.nio=ALL-UNNAMED
+#   - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+#   - -Dloader.path=/thirdparty/mosek
+#   - -Djava.library.path=/thirdparty/mosek
+#   - -Dstore.dataInMemory=false
+#   - -Dstore.financialStatement.betack.dataInMemory=false
+#   - -Dstore.financialStatement.gta.dataInMemory=false
+#   - -Dstore.from=2005-01-04
+#   - -Duse.data.store=rabbeyond
+#   - -jar /opt/betack/rab-svc-api-app-IMAGE_TAG.jar
+commandOps:
+  - JAVA_COMMAND
+
+## akka集群
+akka:
+  enabled: false
+  #+ 默认不创建Role，一个命名空间下，保持一个服务可创建，其它都需要设置为false
+  akkaIsCreateRole: false
+  akkalable: 
+    app: 'saas-data-server'
+  akkaPort: [8558]
+  #+ 此就绪探针与存活探针不能与akka集群的探针同时启用
+  akkaProbe: 
+    livenessProbe: 
+      httpGet:
+        path: /alive
+        port: 8558
+      periodSeconds: 10
+      failureThreshold: 5
+      initialDelaySeconds: 20
+    readinessProbe: 
+      httpGet:
+        path: /ready
+        port: 8558
+      periodSeconds: 10
+      failureThreshold: 3
+      initialDelaySeconds: 10
+  akkaJavaOps:
+    - -Dconfig.file=/opt/betack/akka-config.conf
+  akkaClusterConfMountPath: /opt/betack/akka-config.conf
+  akkaClusterConfSubPath: akka-config.conf
+  akkaClusterConf: |-
+    akka {
+      actor {
+        provider = cluster
+        allow-java-serialization = on
+        warn-about-java-serializer-usage = off
+      }
+
+      cluster {
+        roles = ["MASTER"]
+        shutdown-after-unsuccessful-join-seed-nodes = 250s
+      }
+      coordinated-shutdown.exit-jvm = on
+    }
+
+    akka.cluster.seed-nodes = []
+    akka.extensions = ["akka.management.cluster.bootstrap.ClusterBootstrap"]
+    akka.management {
+      cluster.bootstrap {
+        contact-point-discovery {
+          discovery-method = kubernetes-api
+        }
+      }
+    }
+    akka.management.cluster.bootstrap.contact-point-discovery.required-contact-point-nr=1
+    akka.management.http.route-providers-read-only=false
+    akka.cluster.downing-provider-class = "akka.cluster.sbr.SplitBrainResolverProvider"
+  akkaEnvironmentVariable:
+    AKKA_CLUSTER_BOOTSTRAP_SERVICE_NAME: "saas-data-server"
+
+
+

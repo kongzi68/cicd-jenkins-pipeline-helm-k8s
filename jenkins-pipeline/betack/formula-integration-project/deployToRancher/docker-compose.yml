@@ -1,0 +1,61 @@
+version: '2'
+services:
+  svc-api-app:
+    image: svc-api-app-IMAGE_NAME
+    environment:
+      mysqlPort: '3306'
+      spring.profiles.active: svc-api-app-ENV
+    stdin_open: true
+    volumes:
+    - /data2t/opt/rab_backend/data:/opt/formulaIntegration/data
+    - /data2t/betack/projects/log:/var/log
+    tty: true
+    ports:
+    - 5005:5005/tcp
+    - 5080:80/tcp
+    - 8088:8088/tcp
+    - 50053:50053/tcp
+    command:
+    - java
+    - -Dspring.profiles.active=svc-api-app-ENV
+    - -DLOG_BASE_PATH=/var/log
+    - --add-opens=java.base/java.nio=ALL-UNNAMED
+    - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    - -jar
+    - /opt/betack/svc-api-app-JAR_PKG_NAME
+  svc-data-etl:
+    image: svc-data-etl-IMAGE_NAME
+    environment:
+      mysqlPort: '3306'
+    stdin_open: true
+    ports:
+    - 8081:8081/tcp
+    - 9099:9099/tcp
+    - 50051:50051/tcp
+    volumes:
+    - /data2t/opt/rab_backend/data:/opt/formulaIntegration/data
+    - /data2t/betack/projects/log:/var/log
+    tty: true
+    command:
+    - java
+    - -Dspring.profiles.active=svc-data-etl-ENV
+    - -DLOG_BASE_PATH=/var/log
+    - --add-opens=java.base/java.nio=ALL-UNNAMED
+    - -jar
+    - /opt/betack/svc-data-etl-JAR_PKG_NAME
+  svc-data-migration:
+    image: svc-data-migration-IMAGE_NAME
+    environment:
+      mysqlPort: '3306'
+    stdin_open: true
+    volumes:
+    - /data2t/betack/projects/log:/var/log
+    tty: true
+    command:
+    - java
+    - -Dspring.profiles.active=svc-data-etl-ENV
+    - -DLOG_BASE_PATH=/var/log    
+    - -jar
+    - /opt/betack/svc-data-migration-JAR_PKG_NAME svc-data-migration-OPTIONS
+    labels:
+      io.rancher.container.start_once: 'true'

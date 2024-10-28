@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: alpine-tools-sshd
+  name: alpine-tools-sshd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alpine-tools-sshd
+  template:
+    metadata:
+      labels:
+        app: alpine-tools-sshd
+    spec:
+      containers:
+      - image: harbor.betack.com/libs/alpine:tools-sshd
+        imagePullPolicy: IfNotPresent
+        name: alpine-tools-sshd
+        lifecycle:
+          postStart:
+            exec:
+              command: ["/bin/sh", "-c", "echo 'iamusername:bfisnotgf' | chpasswd"]
+        ports:
+        - name: port-22
+          containerPort: 22
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 550m
+            memory: 1200Mi
+          requests:
+            cpu: 350m
+            memory: 800Mi
+        volumeMounts:
+        - mountPath: /opt/saas_commons/data
+          name: saas-app-server-data
+        - mountPath: /var/log
+          name: saas-app-server-log
+        - mountPath: /thirdparty/mosek
+          name: saas-app-server-mosek
+        - mountPath: /iamusername/mosek
+          name: saas-app-server-mosek-lic
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        nameservers:
+        - IAmIPaddress
+        - IAmIPaddress
+      imagePullSecrets:
+      - name: harbor-outer
+      volumes:
+        - name: saas-app-server-data
+          persistentVolumeClaim:
+            claimName: bf-bsc-staging-1-data-pvc
+        - name: saas-app-server-log
+          persistentVolumeClaim:
+            claimName: bf-bsc-staging-1-log-pvc
+        - name: saas-app-server-mosek
+          persistentVolumeClaim:
+            claimName: bf-bsc-staging-1-mosek-pvc
+        - name: saas-app-server-mosek-lic
+          persistentVolumeClaim:
+            claimName: bf-bsc-staging-1-mosek-lic-pvc
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: alpine-tools-sshd-out
+spec:
+  ports:
+  - name: port-22
+    port: 22
+    protocol: TCP
+    targetPort: 22
+  selector:
+    app: alpine-tools-sshd
+  type: NodePort

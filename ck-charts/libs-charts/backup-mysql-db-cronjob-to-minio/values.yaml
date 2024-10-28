@@ -1,0 +1,38 @@
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: backup-mysql-db-cronjob-to-minio
+namespacePrefix: 'rab'
+
+image:
+  imgMysql: IAmIPaddress/libs/mysql:8.0.35-debian
+  imgAlpineTools: IAmIPaddress/libs/bitnami/minio-client:2024.3.3
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+## mysql 用户名与密码 base64 转码
+#+ 默认值：iamusername/iampassword
+mysql:
+  username: iamusername
+  password: iampassword
+  #+ mysql svc name
+  svcName: 'mysql80-svc'
+  svcPort: '3306'
+
+## minio存储桶的用户名与密码
+storage:
+  username: beifa-backup
+  password: NSx6txS8NLKwfMDmnjlh
+  ipaddr: http://IAmIPaddress:8999
+  #+ bfsh-minio是minio mc命令创建时候的别名
+  minioAlias: bfsh-minio
+  #+ 备份存储的存储桶名称
+  storageBuckets: betack-bak
+
+cronjob:
+  ## 因控制器时区的问题，如果是CST，则为：0 10 * * *
+  #+ 但控制器时区是UTC，需要减 8
+  # schedule: "5 16 * * *"
+  #+ 目前配置了cronjob指定时区为上海，就可以按照正常的时间进行配置
+  schedule: "5 0 * * *"

@@ -1,0 +1,11 @@
+version: '2'
+services:
+  svc-api-app:
+    scale: 1
+    start_on_create: true
+  svc-data-etl:
+    scale: 1
+    start_on_create: true
+  svc-data-migration:
+    scale: 1
+    start_on_create: true

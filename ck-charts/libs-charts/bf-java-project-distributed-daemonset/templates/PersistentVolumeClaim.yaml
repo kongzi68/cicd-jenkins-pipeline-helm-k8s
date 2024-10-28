@@ -1,0 +1,146 @@
+{{ if .Values.storage.isCreateLocalCachePV }}
+## local 卷, https://kubernetes.io/zh-cn/docs/concepts/storage/volumes/#local
+#+ local 卷存储类, https://kubernetes.io/zh-cn/docs/concepts/storage/storage-classes/#local
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Namespace }}-local-cache-pv
+spec:
+  capacity:
+    storage: {{ .Values.storage.localCacheCapacity | default "100Gi" }}
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.storage.localCacheStorageClassName }}
+  local:
+    path: {{ .Values.storage.localCachePath }}
+  nodeAffinity:
+    required:
+      {{- with .Values.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms }}
+      nodeSelectorTerms:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ .Release.Namespace }}-local-cache-pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: {{ .Values.storage.localCacheStorageClassName }}
+  volumeName: {{ .Release.Namespace }}-local-cache-pv
+  resources:
+    requests:
+      storage: {{ .Values.storage.localCacheCapacity | default "100Gi" }}
+{{ end }}
+
+---
+
+{{ if .Values.storage.isCreateParquetPVC }}
+## parquet 共享卷
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Namespace }}-parquet-nfs-pv
+spec:
+  storageClassName: {{ .Values.storage.parquetStorageClassName }}
+  capacity:
+    storage: 500Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    path: /data2t/k8s-nfs-pv/parquet
+    server: IAmIPaddress
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-parquet-nfs-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  storageClassName: {{ .Values.storage.parquetStorageClassName }}
+  volumeName: {{ .Release.Namespace }}-parquet-nfs-pv
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+{{ end }}
+
+---
+
+{{ if .Values.storage.isCreateLogPVC }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-log-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 80Gi
+  storageClassName: {{ .Values.storage.logStorageClassName }}
+{{ end }}
+
+---
+
+{{ if .Values.storage.isCreateMosekPVC }}
+## 153上的存储类
+#+ nfs-client-retain-2 支持命名空间隔离创建存储文件夹
+#+ 即指定了存储类参数 pathPattern: ${.PVC.namespace}/${.PVC.namespace}-${.PVC.name}
+## nfs-client-retain 存储类没有指定
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Namespace }}-mosek-lib-license-nfs-pv
+spec:
+  storageClassName: {{ .Values.storage.mosekStorageClassName }}
+  capacity:
+    storage: 500Mi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    path: /mnt/data-1/nfs/mosek-lib-license
+    server: IAmIPaddress
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-mosek-lib-license-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  storageClassName: {{ .Values.storage.mosekStorageClassName }}
+  volumeName: {{ .Release.Namespace }}-mosek-lib-license-nfs-pv
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Mi
+{{ end }}
+
+---
+
+{{ if .Values.storage.isCreateAlonePVC }}
+## 有些服务，需要单独挂载数据卷
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Namespace }}-data-alone-pvc
+  namespace: {{ .Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: {{ .Values.storage.aloneCapacity | default "300Gi" }}
+  storageClassName: {{ .Values.storage.aloneDataStorageClassName }}
+{{ end }}
+

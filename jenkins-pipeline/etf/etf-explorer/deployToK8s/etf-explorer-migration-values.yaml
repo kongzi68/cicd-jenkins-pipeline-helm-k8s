@@ -1,0 +1,88 @@
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: etf-explorer-migration
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  # imgNameOrSvcName 是指定的镜像名称或者服务名称
+  imgNameOrSvcName: etf-explorer-migration
+  imgHarbor: IAmIPaddress:8765
+  # harborProject 是harbor镜像仓库中创建的项目名称
+  harborProject: etf
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+storage:
+  storageEnable: true
+  ## 二进制数据存储
+  #+ 若 isMountDataPVType 的值为 pvc 同时又需要创建 dataPV 卷时，isCreateDataPVC 应设置为 true；
+  #+ 否则其它情况一律设置为 false
+  isCreateDataPVC: false
+  # 指定挂载的卷类型
+  #+ 若 isMountDataPVType 的值为 empty；此时 isCreateDataPVC 应设置为 false
+  #+ isMountDataPVType 的值可选: empty pvc nil
+  #++ pvc   表示使要 pvc 创建 pv 卷
+  #++ empty 表示使用 emptyDir
+  #++ nil   表示不挂载该卷
+  isMountDataPVType: 'MOUNT_DATA_PV_TYPE'
+  #+ 设置为空的时候，默认创建 500Gi
+  # capacity: ""
+  capacity: PV_SIZE
+  # PVC名称加中缀，特殊情况下使用，默认可设置为空，即''
+  dataPVCNameInfix: ''
+  dataPVCMountPath: TT_DATA_PVC_MOUNT_PATH
+  dataStorageClassName: DATASTORAGECLASSNAME
+  ## 日志存储，挂载日志存储路径：/var/log
+  isCreateLogPVC: false
+  isMountLogPV: false
+  logStorageClassName: DATASTORAGECLASSNAME
+  ## mosek，挂载路径：/thirdparty/mosek，/iamusername/mosek
+  isCreateMosekPVC: false
+  isMountMosekPV: false
+  mosekStorageClassName: DATASTORAGECLASSNAME
+  ## 有些服务，除了需要挂载api的data pv卷，还需要自己独立的pv卷
+  isCreateAlonePVC: false
+  isMountAlonePV: false
+  #+ 设置为空的时候，默认创建 300Gi
+  aloneCapacity: "ALONE_CAPACITY"
+  aloneDataPVCMountPath: ALONE_DATA_PVC_MOUNT_PATH
+  aloneDataStorageClassName: DATASTORAGECLASSNAME
+
+securityContext: {}
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+### isCommand 与 isCommandOps 二选一，将替换镜像中的command
+#+ 或者是都设置为false，即不设置 command，此时默认用镜像中的command
+## 用于直接指定command的项目
+isCommand: false
+command: ''
+
+## 设置服务的启动参数
+isCommandOps: true
+commandOps:
+  - -Xmx2g
+  - -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5004
+  - -Dspring.profiles.active=CONFIG_ENV --add-exports=java.base/jdk.internal.misc=ALL-UNNAMED
+  - -Ddag.client.mode=ONLY_DAG
+  - -Dspring.main.allow-bean-definition-overriding=true
+#+ job 服务启动时，jar 包后面带的选项
+svcJARPKGOptions: etf-explorer-migration-OPTIONS

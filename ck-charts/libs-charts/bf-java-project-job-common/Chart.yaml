@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: **tougu、一tougu后端服务，java项目通用 helm charts
+name: bf-java-project-job-common
+type: application
+version: "0.1.4"

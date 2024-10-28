@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: 备份mysql数据库存储到minio
+name: backup-mysql-db-cronjob-to-minio
+type: application
+version: "0.1.1"

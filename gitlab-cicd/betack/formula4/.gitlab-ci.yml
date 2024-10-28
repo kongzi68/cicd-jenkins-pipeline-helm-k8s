@@ -1,0 +1,120 @@
+stages:
+  - message
+  - test
+  - check
+  - deploy
+
+image: gradle:7.4-jdk11
+
+variables:
+  GIT_CLEAN_FLAGS: -ffdx -e .gradle/
+  GIT_CLONE_PATH: ${CI_BUILDS_DIR}builds/$CI_PROJECT_NAMESPACE/$CI_CONCURRENT_ID/$CI_PROJECT_NAME
+
+before_script:
+  - echo "${GIT_CLONE_PATH}"
+  - export GRADLE_USER_HOME=$GIT_CLONE_PATH/.gradle
+  - export CI_CACHE=true
+  - rm -f ${GRADLE_USER_HOME}/caches/modules-*/modules-*.lock
+  - rm -fr ${GRADLE_USER_HOME}/caches/*/plugin-resolution/
+
+after_script:
+  - echo 'done...'
+
+cache:
+  key: one-key-to-rull-them-all
+  paths:
+    - .gradle/wrapper
+    - .gradle/caches
+
+message:
+  stage: message
+  before_script:
+    - echo "before_script pass."
+  script:
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_MESSAGE|awk -F '^' '{print $(NF-1)}'`
+    - echo "CI_COMMIT_MESSAGE="$CI_COMMIT_MESSAGE
+    - echo "CI_BUILD_REF="$CI_BUILD_REF
+    - echo "CI_BUILD_REF_NAME="$CI_BUILD_REF_NAME
+    - echo "CI_COMMIT_BRANCHz="$CI_COMMIT_BRANCHz
+    - echo "GITLAB_USER_NAME="$GITLAB_USER_NAME
+    - echo "CI_COMMIT_BRANCH="$CI_COMMIT_BRANCH
+    - echo "CI_PROJECT_NAME="$CI_PROJECT_NAME
+    - echo "CI_PIPELINE_ID="$CI_PIPELINE_ID
+    - echo "CI_JOB_URL="$CI_JOB_URL
+    - echo "CI_PIPELINE_URL"=$CI_PIPELINE_URL
+    - echo "CI_PROJECT_URL"=$CI_PROJECT_URL
+    - CI_PROJECT_URLz=`echo $CI_PROJECT_URL|awk -F '//' '{print $2}'`
+    - echo "CI_PROJECT_URLz="$CI_PROJECT_URLz
+    - echo "CI_PROJECT_NAMESPACE="$CI_PROJECT_NAMESPACE
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/ /+/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/%/%25/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/#/%23/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/&/%26/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/=/%3D/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/@/%40/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/</%3c/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/>/%3e/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/\[/%5B/g'`
+    - CI_COMMIT_BRANCHz=`echo $CI_COMMIT_BRANCHz|sed 's/\]/%5D/g'`
+    #- curl -X POST http://IAmIPaddress:8081/view/devops/job/devops-formula/buildWithParameters --user gitlabci:bfisnotgf -d branch=$CI_BUILD_REF_NAME\&commitid=$CI_BUILD_REF\&gitlabuser=$GITLAB_USER_NAME\&project=$CI_PROJECT_NAME\&gitlabns=$CI_PROJECT_NAMESPACE\&beizhu=$CI_COMMIT_BRANCHz\&stack=backend\&errorzz=0
+  after_script:
+    - echo "after_script pass."
+
+unit-test:
+  script:
+    - ./gradlew test --stacktrace -DJFROG_USER=$JFROG_USER -DJFROG_PWD=$JFROG_PWD
+    # - ./gradlew scalaTest -DJFROG_USER=$JFROG_USER -DJFROG_PWD=$JFROG_PWD
+    - ./gradlew test --info
+  stage: test
+  when: delayed
+  start_in: '3 minutes'
+  except:
+    - tags
+
+sonarqube-test:
+  stage: test
+  image: gradle:7.4-jdk11
+  variables:
+    GIT_CLONE_PATH: ${CI_BUILDS_DIR}builds/$CI_PROJECT_NAMESPACE/sonarqube_$CI_CONCURRENT_ID/$CI_PROJECT_NAME
+    CI_PRE_CLONE_SCRIPT: "git config --global http.postBuffer 5368709120"
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    # GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+    GIT_DEPTH: 2147483647
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .gradle/caches
+      - .sonar/cache
+  script:
+    - ./gradlew sonarqube --stacktrace -Dsonar.host.url=$SONAR_HOST_URL -Dsonar.login=$SONAR_TOKEN -Dsonar.projectKey=formula4
+  except:
+    - tags
+
+check:
+  stage: check
+  before_script:
+    - echo "before_script pass."
+  script:
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/ /+/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/%/%25/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/#/%23/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/&/%26/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/=/%3D/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/@/%40/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/</%3c/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/>/%3e/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/\[/%5B/g'`
+    - CI_COMMIT_MESSAGE=`echo $CI_COMMIT_MESSAGE|sed 's/\]/%5D/g'`
+    #- curl -X POST http://IAmIPaddress:8081/view/devops/job/devops-formula/buildWithParameters --user gitlabci:bfisnotgf -d branch=$CI_BUILD_REF_NAME\&commitid=$CI_BUILD_REF\&gitlabuser=$GITLAB_USER_NAME\&project=$CI_PROJECT_NAME\&gitlabns=$CI_PROJECT_NAMESPACE\&beizhu=$CI_COMMIT_MESSAGE\&stack=backend\&errorzz="单元测试或者覆盖率测试异常"
+  when: on_failure
+  after_script:
+    - echo "after_script pass."
+
+deploy:
+  stage: deploy
+  script:
+    - gradle clean publish -DJFROG_USER=$JFROG_USER -DJFROG_PWD=$JFROG_PWD
+  only:
+    - tags
+  except:
+    - branches

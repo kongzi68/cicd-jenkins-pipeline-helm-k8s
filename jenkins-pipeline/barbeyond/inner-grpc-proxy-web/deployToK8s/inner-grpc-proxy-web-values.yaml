@@ -1,0 +1,77 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: inner-grpc-proxy-web
+namespacePrefix: 'NAMESPACEPREFIX-'
+
+image:
+  repository: IAmIPaddress:8765/rabbeyond/inner-grpc-proxy-web
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+storage:
+  ## 设置为空的时候，默认创建 300Gi
+  capacity: ""
+  # capacity: 500Gi
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [8090] # 容器需要启动的端口
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+commands: "./grpc-web-proxy -F ./proxy.toml"
+
+configuration: |-
+  # api_routes和static_profiles不能出现相同名称的domain
+
+  api_routes=[
+      # data-insight-server 的主机信息
+      IS_NEED_INSIGHT_SERVER{domain="/rabbeyond/insight_server", grpc="IAmIPaddress:DATA_INSIGHT_SVC_PORT", ws="http://IAmIPaddress:DATA_INSIGHT_SVC_PORT"},
+
+      # rabbeyond grpc的主机信息
+      {domain="/rabbeyond/storage", grpc="IAmIPaddress:SDK_GRPC_SVC_PORT", ws="http://IAmIPaddress:SDK_GRPC_SVC_PORT"},
+
+      {domain="/rabbeyond/subscribe", grpc="IAmIPaddress:SDK_GRPC_SVC_PORT", ws="http://IAmIPaddress:SDK_GRPC_SVC_PORT"},
+  ]
+
+  static_profiles=[
+      # 配置前端项目的根目录 —— 一定是打包好的静态包
+      #+ 这里因独立部署了rabbeyond-fe，需把下面这行配置注释掉
+      #{domain="/rabbeyond-ui", proxy_port = 10000, iamusername="/opt/rabbeyond-fe/packages/rabbeyond-ui/build"}
+  ]
+
+  host_addr="IAmIPaddress:8090"
+  allowed_cors_domains="*"
+  allowed_cors_headers="*"

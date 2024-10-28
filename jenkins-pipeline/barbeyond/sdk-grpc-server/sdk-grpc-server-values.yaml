@@ -1,0 +1,154 @@
+replicaCount: 1
+hostNetwork: false
+revisionHistoryLimit: 5
+nameOverride: "sdk-grpc-server"
+namespacePrefix: 'NAMESPACEPREFIX'
+
+image:
+  repository: IAmIPaddress:8765/rabbeyond/sdk-grpc-server
+  pullPolicy: IfNotPresent
+  tag: "IMAGE_TAG"
+
+imagePullSecrets:
+  - name: harbor-inner
+  - name: harbor-outer
+
+storage:
+  storageEnable: true
+  ## 二进制数据存储
+  #+ 若 isMountDataPVType 的值为 pvc 同时又需要创建 dataPV 卷时，isCreateDataPVC 应设置为 true；
+  #+ 否则其它情况一律设置为 false
+  isCreateDataPVC: false
+  # 指定挂载的卷类型
+  #+ isMountDataPVType 的值可选: pvc nil，指定挂载卷及类型
+  #++ pvc  表示使要 pvc 创建的 pv 卷
+  #++ nil  表示不挂载该卷
+  isMountDataPVType: 'nil'
+  #+ 设置为空的时候，默认创建 300Gi
+  capacity: ""
+  # capacity: 50Gi
+  # PVC名称加中缀，特殊情况下使用，默认可设置为空，即''
+  dataPVCNameInfix: ''
+  dataPVCMountPath: /opt/rab_backend/data
+  dataStorageClassName: nfs-client-retain
+
+securityContext: {}
+
+## 设置service创建类型
+#+ isIn 为 true，表示创建 ClusterIP 类型
+#+ isOut 为 true，表示创建 NodePort 类型，fasle 表示不创建
+service:
+  isIn: false
+  isOut: true
+  ports: [50053] # 容器需要启动的端口
+
+resources: {}
+#  requests:
+#    cpu: "1"
+#    memory: "2048Mi"
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+autoscaling: {}
+  # enabled: false
+  # minReplicas: 1
+  # maxReplicas: 100
+  # targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+commands: "java -jar /opt/betack/JAR_PKG_NAME"
+
+configuration: |-
+  # 服务器端口
+  [rabbeyond.server]
+  port = 50053
+
+  #存储配置
+  [storage]
+  type = "File"
+  dataDir = "/opt/rab_backend/data"
+
+  #认证
+  [authenticate]
+  # current just support Basic
+  type="Basic"
+  username="IamUserName"
+  password="secret"
+
+  # 上传限制和配置
+  [upload]
+  # maxWriteBatchSize=10000时 org.apache.arrow.memory.ArrowBuf.checkIndex会报错，
+  # java.lang.IndexOutOfBoundsException: index: 32760, length: 9 (expected: range(0, 32768))
+  maxWriteBatchSize=1000
+  maxFutureWaitSeconds=1800
+
+  [formula]
+  tradingDayTable="trading_day"
+  allUniverseFullCode="stock:stock.unv.all,fund:fund.unv.all"
+  enableCalcUniverse="false"
+  calcUniversePhysicalFullCode="stock:stock_universe.all,fund:fund_universe.all"
+  #保存因子的时候用 股票的上市退市日期过滤一下，因为有的因子，退市后也可以算出
+  enableSaveFactorFilterBySecurityListDelistDate="false"
+  #股票上市退市日期表，目前用日频因子的物理表
+  categoryToSecurityTable="stock:stock_daily_factor,fund:fund_daily_factor"
+  #用基础因子的截止时间来限制其它因子的计算范围,由于基础因子（例如股票close）的每个股票的start,end获取不到，所以这里可以用股票上市日期
+  #和formula.system.start 和 下面选择的这个因子的start,end合成一个因子每个股票的计算范围
+  categoryToFactorFullCode="stock:stock.factor.Day_Yield,fund:fund.factor.Day_Yield"
+  defaultFactorTimeUnit="td"
+  findCodeMode="MULTI"
+
+  [formula.system]
+  start="2005-01-01"
+
+  [formula.daySeq]
+  # 配置公式读取的默认交易日:如果配置错误则无法找到因子
+  tableName="all"
+
+  [formula.universe]
+  # 配置默认债券配置
+  tableName="all"
+  universeCode="csi300"
+  # 请求中head的股池key
+  universeCodeKey="x-universe-full-code"
+
+  [dag]
+  dataMetaOn="false"
+  dagParallelNum=4
+  jobParallelNum=20
+  batchMonth=12
+
+  [dag.datasource]
+  driver="com.mysql.cj.jdbc.Driver"
+  url="jdbc:mysql://IAmIPaddress:3306/rabbeyond_multi_market"
+  username="iamusername"
+  password="iampassword"
+
+  [hikari.dataSource]
+  connectionTestQuery= "SELECT 1 FROM DUAL"
+  minimumIdle="1"
+  maximumPoolSize="10"
+  maxLifetime="180000000"
+
+  [dag.factor]
+  tableName="csi_pro"
+
+  [dag.universe]
+  tableName="zsi"
+  code="zsi100"
+
+  [log]
+  enable=true
+  configPath="config/mybatis-config-log-meta.xml"
+  notifyInterval=600
+
+  [quality]
+  enable="false"

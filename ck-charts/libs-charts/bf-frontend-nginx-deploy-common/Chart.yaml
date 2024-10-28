@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: 前端项目 nginx 通用 helm chart，bf-frontend-nginx-deploy-common
+name: bf-frontend-nginx-deploy-common
+type: application
+version: "0.1.3"

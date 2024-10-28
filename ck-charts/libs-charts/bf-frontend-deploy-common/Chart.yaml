@@ -1,0 +1,6 @@
+apiVersion: v2
+appVersion: "latest"
+description: **前端项目，非nginx部署方式
+name: bf-frontend-deploy-common
+type: application
+version: "0.1.2"

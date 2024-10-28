@@ -1,0 +1,176 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.nameOverride }}-dbbak-script
+data:
+  bak_mysql_db.sh: |
+    #!/bin/bash
+    # by colin on 2023-05-24
+    # revision on 2023-05-24
+    ##################################
+    ##脚本功能：
+    # 备份mysql数据库
+    #
+    ##脚本说明：
+
+    PATH='/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+    ## 输出绿色日志，表成功类型
+    echoGoodLog() {
+        /bin/echo -e "\033[32m$(date +%F" "%T":"%N)|$(basename $0)|$*\033[0m"
+    }
+
+    ## 输出红色日志，表失败类型
+    echoBadLog() {
+        /bin/echo -e "\033[31m$(date +%F" "%T":"%N)|$(basename $0)|$*\033[0m"
+    }
+
+    ## 飞书机器人消息通知
+    #+ MSG 不能包含空格
+    #+ 变量必须要用单引号包裹
+    sendMsgByFeishu() {
+        MSG_TITLE=$1
+        MSG=$2
+        curl -X POST -H "Content-Type: application/json" \
+        -d '{
+                "msg_type": "post",
+                "content": {
+                    "post": {
+                        "zh_cn": {
+                            "title": "'${MSG_TITLE}'",
+                            "content": [[
+                                {
+                                    "tag": "text",
+                                    "text": "命名空间: '${MY_POD_NAMESPACE}'\n"
+                                },
+                                {
+                                    "tag": "text",
+                                    "text": "消息内容: '${MSG}'\n"
+                                },
+                                {
+                                    "tag": "at",
+                                    "user_id": "ou_4673ade326fdc6dee39664b0c64b1408",
+                                    "user_name": "姓名"
+                                }
+                            ]]
+                        }
+                    }
+                }
+            }' \
+        https://open.feishu.cn/open-apis/bot/v2/hook/c49b4bbe-d828-46a6-9cb9-2157e15c1606
+        echo -e '\n'
+    }
+
+    ## 备份数据库
+    echoGoodLog "Now, Script: $(basename $0) running."
+    EXCLUDE_DBNAMES=(
+        information_schema
+        mysql
+        performance_schema
+        sys
+    )
+    DEFAULT_DB_LIST=$(mysql --defaults-extra-file=/iamusername/my.password -h${MYSQL_SVC_NAME} -Ne "show databases;")
+    DB_LIST="${1:-$DEFAULT_DB_LIST}"
+    for DBNAME in ${DB_LIST};do
+        #+ 注意：若库名含有字符'-'，则判断不准确
+        echo ${EXCLUDE_DBNAMES[*]} | grep -wqF $DBNAME || {
+            echoGoodLog "Backing up $DBNAME."
+            MYSQLDUMP_ERROR_LOG="${DBNAME}-log-$(date +%Y%m%d%H).log"
+            mysqldump --defaults-extra-file=/iamusername/my.password -h${MYSQL_SVC_NAME} --opt --single-transaction \
+            -R --triggers --add-drop-database --databases "$DBNAME" --log-error="${MYSQLDUMP_ERROR_LOG}" \
+            | gzip > "${DBNAME}-$(date +%Y%m%d%H).sql.gz"
+            # 判断错误日志，grep 到关键词 mysqldump 表明有错误
+            if grep -v "Warning" "${MYSQLDUMP_ERROR_LOG}" | grep "mysqldump";then
+                echoBadLog "Backup $DBNAME failed, Please check..."
+                sendMsgByFeishu "数据库每日备份失败通知" "数据库${DBNAME}每日备份失败，请检查！！！"
+            else
+                echoGoodLog "Backup $DBNAME successfully."
+                # sendMsgByFeishu "数据库每日备份成功通知" "数据库${DBNAME}每日备份成功。只是为了测试功能，正式启用后，备份成功不发消息通知。"
+            fi
+            ls -lh "${DBNAME}-$(date +%Y%m%d%H).sql.gz"
+        }
+    done
+    echoGoodLog "Script: $(basename $0) run done."
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.nameOverride }}-scp-script
+data:
+  scp_bakpkg_to_storage_server.sh: |
+    #!/bin/bash
+    # by colin on 2023-05-24
+    # revision on 2023-05-24
+    ##################################
+    ##脚本功能：
+    # 把备份包传送到远程存储服务器
+    #
+    ##脚本说明：
+
+    PATH='/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+    ## 输出绿色日志，表成功类型
+    echoGoodLog() {
+        /bin/echo -e "\033[32m$(date +%F" "%T":"%N)|$(basename $0)|$*\033[0m"
+    }
+
+    ## 输出红色日志，表失败类型
+    echoBadLog() {
+        /bin/echo -e "\033[31m$(date +%F" "%T":"%N)|$(basename $0)|$*\033[0m"
+    }
+
+    ## 飞书机器人消息通知
+    #+ MSG 不能包含空格
+    #+ 变量必须要用单引号包裹
+    sendMsgByFeishu() {
+        MSG_TITLE=$1
+        MSG=$2
+        curl -X POST -H "Content-Type: application/json" \
+        -d '{
+                "msg_type": "post",
+                "content": {
+                    "post": {
+                        "zh_cn": {
+                            "title": "'${MSG_TITLE}'",
+                            "content": [[
+                                {
+                                    "tag": "text",
+                                    "text": "命名空间: '${MY_POD_NAMESPACE}'\n"
+                                },
+                                {
+                                    "tag": "text",
+                                    "text": "消息内容: '${MSG}'\n"
+                                },
+                                {
+                                    "tag": "at",
+                                    "user_id": "ou_4673ade326fdc6dee39664b0c64b1408",
+                                    "user_name": "姓名"
+                                }
+                            ]]
+                        }
+                    }
+                }
+            }' \
+        https://open.feishu.cn/open-apis/bot/v2/hook/c49b4bbe-d828-46a6-9cb9-2157e15c1606
+        echo -e '\n'
+    }
+
+    echoGoodLog "Now, Script: $(basename $0) running."
+    ## 传送备份包
+    for item in $(find . -name "*.sql.gz");do
+        BAK_PKG="$(basename $item)"
+        BAK_PKG_STORAGE_DIR="${STORAGE_DIR}/${MY_POD_NAMESPACE}"
+        sshpass -p ${STORAGE_PASSWORD} ssh -o StrictHostKeyChecking=no ${STORAGE_USERNAME}@${STORAGE_IPADDR} "[ -d ${BAK_PKG_STORAGE_DIR} ] || mkdir -p ${BAK_PKG_STORAGE_DIR}"
+        if sshpass -p ${STORAGE_PASSWORD} scp -o StrictHostKeyChecking=no ${BAK_PKG} ${STORAGE_USERNAME}@${STORAGE_IPADDR}:${BAK_PKG_STORAGE_DIR};then
+            echoGoodLog "Scp ${BAK_PKG} successfully."
+            # sendMsgByFeishu "数据库每日更新备份包保存成功" "数据库${BAK_PKG}备份到存储服务器成功。测试数据，启用后，成功不发通知。"
+        else
+            echoBadLog "Scp ${BAK_PKG} failed, Please check..."
+            sendMsgByFeishu "数据库每日更新备份包保存失败" "数据库${BAK_PKG}备份到存储服务器失败，请检查！！！"
+        fi
+    done
+    sshpass -p ${STORAGE_PASSWORD} ssh -o StrictHostKeyChecking=no ${STORAGE_USERNAME}@${STORAGE_IPADDR} "cd ${BAK_PKG_STORAGE_DIR} && find . -name '*.sql.gz' -ctime '+7' -delete"
+    echoGoodLog "Script: $(basename $0) run done."
+
